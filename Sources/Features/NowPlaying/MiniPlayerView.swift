@@ -26,7 +26,7 @@ struct MiniPlayerView: View {
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title3)
-                        .foregroundStyle(CratesColor.playback)
+                        .foregroundStyle(CratesColor.accent)
                         .contentTransition(.symbolEffect(.replace))
                         .frame(width: 36, height: 36)
                 }

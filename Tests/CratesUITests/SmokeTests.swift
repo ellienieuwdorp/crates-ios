@@ -42,10 +42,11 @@ final class SmokeTests: XCTestCase {
         // Expand to the full player via the mini player (the accessory is the last match).
         let accessory = matches.element(boundBy: max(0, matches.count - 1))
         accessory.tap()
-        let queueButton = app.buttons["list.bullet"].firstMatch
-        if queueButton.waitForExistence(timeout: 3) {
-            queueButton.tap()
-            XCTAssertTrue(app.staticTexts["Up Next"].waitForExistence(timeout: 3))
+        // Full player embeds the Up Next queue behind a handle; tapping it opens the full sheet.
+        let upNextHandle = app.staticTexts["Up Next"].firstMatch
+        if upNextHandle.waitForExistence(timeout: 3) {
+            upNextHandle.tap()
+            XCTAssertTrue(app.navigationBars["Queue"].waitForExistence(timeout: 3))
         }
     }
 

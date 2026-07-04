@@ -27,7 +27,7 @@ struct TrackRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(tune.displayTitle)
                     .font(.body.weight(isCurrent ? .semibold : .regular))
-                    .foregroundStyle(isCurrent ? CratesColor.playback : .primary)
+                    .foregroundStyle(isCurrent ? CratesColor.accent : .primary)
                     .lineLimit(1)
                 HStack(spacing: 5) {
                     SourceBadge(source: tune.source)
@@ -72,7 +72,7 @@ struct TrackRow: View {
             } label: {
                 Label("Play Next", systemImage: "text.insert")
             }
-            .tint(CratesColor.playback)
+            .tint(CratesColor.accentDeep)
         }
         .sensoryFeedback(.success, trigger: feedbackTrigger)
         .overlay(alignment: .trailing) {
@@ -103,7 +103,7 @@ struct TrackRow: View {
         .padding(.vertical, 6)
         // Solid capsule, not tinted glass: this is a content-layer confirmation, and a near-opaque
         // tint on glass defeats the material anyway (HIG: tint glass sparingly, chrome only).
-        .background(action == .queued ? CratesColor.accent : CratesColor.playback, in: .capsule)
+        .background(action == .queued ? CratesColor.accent : CratesColor.accentDeep, in: .capsule)
         .foregroundStyle(.white)
     }
 
@@ -112,7 +112,7 @@ struct TrackRow: View {
             .font(.caption2.weight(.bold))
             .foregroundStyle(.white)
             .padding(4)
-            .background(CratesColor.playback, in: .circle)
+            .background(CratesColor.accent, in: .circle)
             .offset(x: 3, y: 3)
     }
 }

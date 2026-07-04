@@ -3,9 +3,11 @@ import SwiftUI
 /// Crates palette, sampled pixel-for-pixel from the desktop app UI, with a clear role hierarchy:
 ///
 ///   • `accent`   TEAL   #00868D — structure & interaction (tabs, links, buttons, controls,
-///                                  selection). The desktop's brand-primary; what users tap.
-///   • `playback` ORANGE #D88810 — playback energy (now-playing, waveform, current track,
-///                                  "play next"). The desktop reserves this for the waveform.
+///                                  selection) AND playback controls / now-playing highlights.
+///                                  The desktop's brand-primary; what users tap.
+///   • `playback` ORANGE #D88810 — reserved for the waveform scrubber (matching the desktop,
+///                                  which keeps orange for the waveform only). NOT for controls —
+///                                  orange-tinted buttons read off-brand (Ellie, 2026-07-04).
 ///   • `green`           #089848 — settled success (downloaded, cache up-to-date).
 ///   • `red`             danger.
 ///

@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Full-screen player (Idea #4 v0): big art, title/artist, scrubber, transport, shuffle/repeat,
-/// and a queue button that presents the queue sheet (Idea #5). Waveform scrubber and click-through
-/// to artist/album are deliberately deferred (Idea #4 "later").
+/// Full-screen player (Idea #4 v1): big art, title/artist, scrubber, a single transport row
+/// (shuffle · back · play · forward · repeat), and an embedded Up Next queue behind a grab
+/// handle — drag or tap the handle to open the full queue sheet with reorder/edit. Waveform
+/// scrubber and click-through to artist/album are deliberately deferred (Idea #4 "later").
 struct NowPlayingView: View {
     @Environment(PlaybackController.self) private var player
     @Environment(\.dismiss) private var dismiss
@@ -11,12 +12,11 @@ struct NowPlayingView: View {
     @State private var isScrubbing = false
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             grabber
             if let tune = player.current {
-                Artwork(tune: tune, size: 300)
+                Artwork(tune: tune, size: 260)
                     .shadow(color: .black.opacity(0.25), radius: 24, y: 12)
-                    .padding(.top, 8)
 
                 VStack(spacing: 6) {
                     Text(tune.displayTitle).font(.title2.bold()).multilineTextAlignment(.center).lineLimit(2)
@@ -39,8 +39,7 @@ struct NowPlayingView: View {
 
                 scrubber
                 transport
-                Spacer()
-                bottomBar
+                queuePanel
             } else {
                 ContentUnavailableView("Nothing playing", systemImage: "music.note")
             }
@@ -64,7 +63,7 @@ struct NowPlayingView: View {
                 isScrubbing = editing
                 if !editing { player.seek(to: scrubValue) }
             }
-            .tint(CratesColor.playback)
+            .tint(CratesColor.accent)
             HStack {
                 Text(timeLabel(isScrubbing ? scrubValue : player.currentTime))
                 Spacer()
@@ -75,41 +74,103 @@ struct NowPlayingView: View {
         }
     }
 
+    /// One row: mode toggles at the edges, transport in the middle — frees the bottom of the
+    /// sheet for the queue.
     private var transport: some View {
-        HStack(spacing: 44) {
-            Button { player.previous() } label: { Image(systemName: "backward.fill").font(.title) }
-            Button { player.togglePlayPause() } label: {
-                Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 68))
-                    .foregroundStyle(CratesColor.playback)
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            Button { player.next() } label: { Image(systemName: "forward.fill").font(.title) }
-        }
-        .foregroundStyle(.primary)
-        .tint(CratesColor.accent)
-    }
-
-    private var bottomBar: some View {
         HStack {
             Button { player.isShuffled.toggle() } label: {
-                Image(systemName: "shuffle")
+                Image(systemName: "shuffle").font(.title3)
                     .foregroundStyle(player.isShuffled ? CratesColor.accent : CratesColor.textSecondary)
             }
             Spacer()
-            Button { showQueue = true } label: {
-                Image(systemName: "list.bullet").foregroundStyle(CratesColor.accent)
+            Button { player.previous() } label: { Image(systemName: "backward.fill").font(.title) }
+            Spacer()
+            Button { player.togglePlayPause() } label: {
+                Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.system(size: 64))
+                    .foregroundStyle(CratesColor.accent)
+                    .contentTransition(.symbolEffect(.replace))
             }
             Spacer()
+            Button { player.next() } label: { Image(systemName: "forward.fill").font(.title) }
+            Spacer()
             Button { cycleRepeat() } label: {
-                Image(systemName: player.repeatMode == .one ? "repeat.1" : "repeat")
+                Image(systemName: player.repeatMode == .one ? "repeat.1" : "repeat").font(.title3)
                     .foregroundStyle(player.repeatMode == .off ? CratesColor.textSecondary : CratesColor.accent)
             }
         }
-        .font(.title3)
-        .padding(.horizontal, 32)
-        .padding(.bottom, 24)
+        .foregroundStyle(.primary)
+        .tint(CratesColor.accent)
+        .padding(.horizontal, 8)
     }
+
+    // MARK: - Embedded queue
+
+    /// The freed bottom space: a handlebar + scrollable Up Next list. Tap a row to jump; grab
+    /// (drag up) or tap the handle to open the full queue sheet with reorder/remove.
+    private var queuePanel: some View {
+        VStack(spacing: 0) {
+            queueHandle
+            if upNext.isEmpty {
+                Text("Nothing up next — swipe right on any track to queue it.")
+                    .font(.footnote).foregroundStyle(CratesColor.textSecondary)
+                    .frame(maxHeight: .infinity, alignment: .center)
+                    .padding(.horizontal)
+            } else {
+                List {
+                    ForEach(upNext) { entry in
+                        QueueRow(tune: entry.tune, isCurrent: false)
+                            .contentShape(.rect)
+                            .onTapGesture {
+                                if let i = player.entries.firstIndex(where: { $0.id == entry.id }) {
+                                    player.jump(to: i)
+                                }
+                            }
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(.init(top: 6, leading: 4, bottom: 6, trailing: 4))
+                    }
+                    .onDelete { offsets in
+                        player.removeFromQueue(at: mappedOffsets(offsets))
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var queueHandle: some View {
+        VStack(spacing: 6) {
+            Capsule().fill(CratesColor.textSecondary.opacity(0.35))
+                .frame(width: 36, height: 4)
+            HStack {
+                Text("Up Next").font(.headline)
+                if !upNext.isEmpty {
+                    Text("\(upNext.count)").font(.subheadline.monospacedDigit())
+                        .foregroundStyle(CratesColor.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.up")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(CratesColor.textSecondary)
+            }
+        }
+        .padding(.vertical, 8)
+        .contentShape(.rect)
+        .onTapGesture { showQueue = true }
+        .gesture(
+            DragGesture(minimumDistance: 12).onEnded { value in
+                if value.translation.height < -20 { showQueue = true }
+            }
+        )
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("Open full queue")
+    }
+
+    private var upNextStart: Int { (player.currentIndex ?? -1) + 1 }
+    private var upNext: [QueueEntry] { Array(player.entries.dropFirst(upNextStart)) }
+    private func mappedOffsets(_ offsets: IndexSet) -> IndexSet { IndexSet(offsets.map { $0 + upNextStart }) }
 
     private func cycleRepeat() {
         player.repeatMode = switch player.repeatMode {

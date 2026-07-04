@@ -66,11 +66,11 @@ struct QueueRow: View {
             Artwork(tune: tune, size: 40)
             VStack(alignment: .leading, spacing: 1) {
                 Text(tune.displayTitle).font(.subheadline.weight(isCurrent ? .bold : .regular))
-                    .foregroundStyle(isCurrent ? CratesColor.playback : .primary).lineLimit(1)
+                    .foregroundStyle(isCurrent ? CratesColor.accent : .primary).lineLimit(1)
                 Text(tune.displayArtist).font(.caption).foregroundStyle(CratesColor.textSecondary).lineLimit(1)
             }
             Spacer()
-            if isCurrent { Image(systemName: "speaker.wave.2.fill").foregroundStyle(CratesColor.playback).font(.caption) }
+            if isCurrent { Image(systemName: "speaker.wave.2.fill").foregroundStyle(CratesColor.accent).font(.caption) }
         }
     }
 }

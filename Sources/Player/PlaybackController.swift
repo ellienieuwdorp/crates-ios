@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import MediaPlayer
 import Observation
+import UIKit
 
 enum RepeatMode: Sendable { case off, all, one }
 
@@ -47,6 +48,10 @@ final class PlaybackController {
     private var audioSessionActivated = false
     private var connection: CratesConnection?
     private var downloads: DownloadManager?
+    /// Lock-screen / Control Center artwork for the current track. Kept alongside its coverID so
+    /// `updateNowPlaying()` never attaches a stale image after a track change.
+    private var currentArtwork: (coverID: Int64, artwork: MPMediaItemArtwork)?
+    private var artworkTask: Task<Void, Never>?
 
     init() {
         // Category only — activation waits for the first actual play, so launching the app never
@@ -149,6 +154,7 @@ final class PlaybackController {
         player = nil
         currentIndex = nil; isPlaying = false
         currentTime = 0; duration = 0; playbackError = nil
+        artworkTask?.cancel(); artworkTask = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
@@ -219,6 +225,7 @@ final class PlaybackController {
         activateAudioSessionIfNeeded()
         p.play(); isPlaying = true
         updateNowPlaying()
+        loadArtwork(for: tune)
     }
 
     /// Local file wins if downloaded; otherwise stream by tune id (Philosophy #4/#5).
@@ -324,7 +331,28 @@ final class PlaybackController {
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
         ]
         if duration > 0 { info[MPMediaItemPropertyPlaybackDuration] = duration }
+        if let art = currentArtwork, art.coverID == tune.coverID {
+            info[MPMediaItemPropertyArtwork] = art.artwork
+        }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    /// Fetch the cover for the system player. Covers come from the unauthenticated
+    /// `/covers/byCoverID/{id}` endpoint; no cover, demo mode, or fetch failure just leaves the
+    /// system player artless — never blocks playback.
+    private func loadArtwork(for tune: Tune) {
+        artworkTask?.cancel()
+        guard let coverID = tune.coverID else { return }
+        if currentArtwork?.coverID == coverID { return } // same cover (e.g. same album), keep it
+        guard let url = connection?.coverURL(coverID: coverID) else { return }
+        artworkTask = Task { [weak self] in
+            guard let (data, _) = try? await URLSession.shared.data(from: url),
+                  let image = UIImage(data: data), !Task.isCancelled else { return }
+            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            guard let self, self.current?.coverID == coverID else { return }
+            self.currentArtwork = (coverID, artwork)
+            self.updateNowPlaying()
+        }
     }
 
     private func updateNowPlayingTime() {

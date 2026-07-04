@@ -38,5 +38,11 @@ final class ScreenshotTests: XCTestCase {
         matches.element(boundBy: max(0, matches.count - 1)).tap()
         sleep(1)
         shot("04-now-playing")
+
+        // Back to Home with the mini player up — the hotlink grid must sit above the accessory.
+        app.swipeDown(velocity: .fast)
+        app.buttons["Home"].firstMatch.tap()
+        sleep(1)
+        shot("05-home-with-miniplayer")
     }
 }
