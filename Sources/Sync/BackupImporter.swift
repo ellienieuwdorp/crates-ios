@@ -232,6 +232,30 @@ enum BackupImporter {
             .filter { !hasParent.contains($0.id) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
+        // Mosaic previews: first 4 distinct covers per crate — own tunes first, then a bounded
+        // BFS into the subtree (container crates like "Collection" hold no direct tunes).
+        var previewCoverIDsByCrate: [Int64: [Int64]] = [:]
+        for crateID in crateByID.keys {
+            var covers: [Int64] = []
+            var seenCovers = Set<Int64>()
+            var visited = Set<Int64>()
+            var queue = [crateID]
+            var hops = 0
+            while !queue.isEmpty, covers.count < 4, hops < 64 { // bound: deep trees stay cheap
+                let id = queue.removeFirst()
+                hops += 1
+                guard visited.insert(id).inserted else { continue }
+                for tune in tunesByCrate[id] ?? [] {
+                    if let c = tune.coverID, seenCovers.insert(c).inserted {
+                        covers.append(c)
+                        if covers.count == 4 { break }
+                    }
+                }
+                queue.append(contentsOf: (childIDsByParent[id] ?? []).sorted { $0.1 < $1.1 }.map(\.0))
+            }
+            if !covers.isEmpty { previewCoverIDsByCrate[crateID] = covers }
+        }
+
         return LibrarySnapshot(
             rootCrates: rootCrates,
             childrenByCrate: childrenByCrate,
@@ -240,6 +264,7 @@ enum BackupImporter {
             allTunes: tunesByID.values.sorted {
                 $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending
             },
+            previewCoverIDsByCrate: previewCoverIDsByCrate,
             tuneCount: tunesByID.count
         )
     }

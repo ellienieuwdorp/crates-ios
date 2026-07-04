@@ -71,6 +71,49 @@ struct Artwork: View {
     }
 }
 
+/// A single cover by ID (mosaic cells) through the ArtworkStore: synchronous when cached,
+/// gradient placeholder otherwise (seeded by coverID, so demo mode gets stable colorful cells).
+struct CoverImage: View {
+    @Environment(AppModel.self) private var model
+    let coverID: Int64
+
+    @State private var loaded: (id: Int64, image: UIImage)?
+
+    private var canFetch: Bool { !model.isDemo && model.connection.isConfigured }
+
+    var body: some View {
+        Group {
+            if let image = displayImage {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                Rectangle().fill(Self.gradient(seed: coverID))
+            }
+        }
+        .task(id: coverID) {
+            guard canFetch, loaded?.id != coverID,
+                  ArtworkStore.shared.cachedImage(coverID: coverID, variant: .row) == nil else { return }
+            if let image = await ArtworkStore.shared.image(coverID: coverID, variant: .row) {
+                withAnimation(.easeOut(duration: 0.2)) { loaded = (coverID, image) }
+            }
+        }
+    }
+
+    private var displayImage: UIImage? {
+        guard canFetch else { return nil }
+        if let hit = ArtworkStore.shared.cachedImage(coverID: coverID, variant: .row) { return hit }
+        if let loaded, loaded.id == coverID { return loaded.image }
+        return nil
+    }
+
+    static func gradient(seed: Int64) -> LinearGradient {
+        let hue = Double((seed &* 2654435761) % 360) / 360.0
+        return LinearGradient(
+            colors: [Color(hue: hue, saturation: 0.5, brightness: 0.55),
+                     Color(hue: (hue + 0.09).truncatingRemainder(dividingBy: 1), saturation: 0.55, brightness: 0.4)],
+            startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
 /// The small provenance glyph shown per row (Idea #7).
 struct SourceBadge: View {
     let source: TrackSource

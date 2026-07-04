@@ -110,5 +110,9 @@ struct LibrarySnapshot: Sendable {
     /// required: tunesByCrate is only lazily hydrated after cold start, so scanning it would
     /// silently search nothing.
     var allTunes: [Tune]
+    /// First 4 distinct cover IDs per crate (own tunes, then subtree BFS) — feeds the Home
+    /// mosaic tiles. Computed at import (off-main) and persisted with the crate index so tiles
+    /// render from cold start.
+    var previewCoverIDsByCrate: [Int64: [Int64]] = [:]
     var tuneCount: Int
 }

@@ -103,10 +103,11 @@ struct HomeView: View {
     /// append nearest the thumb). Seeded once with the top roots so it's never empty.
     private var hotlinks: some View {
         let pinned = model.pins.ids.compactMap { library.crate(byID: $0) }
-        return LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
+        return LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+                         spacing: 16) {
             ForEach(pinned) { crate in
                 NavigationLink { CrateDetailView(crate: crate) } label: {
-                    HotlinkTile(crate: crate)
+                    CrateTile(crate: crate, coverIDs: library.previewCoverIDs(for: crate.id))
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
@@ -119,33 +120,72 @@ struct HomeView: View {
     }
 }
 
-/// A quiet, flat surface tile — symbol and count on top, name at the bottom. No border stroke and
-/// no icon chip; the large continuous radius echoes the Liquid Glass chrome without imitating it
-/// (HIG reserves glass for floating controls, so this stays a content-layer surface).
-struct HotlinkTile: View {
+/// Content-led crate tile (dogfood round 4, I9): the crate's artwork IS the tile — a 2×2 mosaic
+/// of its subtree's covers (Apple Music's playlist/folder convention), name + count as a plain
+/// text stack below on the app background. No card container, no borders except a 0.5pt
+/// hairline on the art (white-cover-on-white separation), no glass, no accent tint: content
+/// carries the identity, chrome keeps the color.
+struct CrateTile: View {
     let crate: Crate
+    let coverIDs: [Int64]
+    private static let radius: CGFloat = 20
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                Image(systemName: crate.symbol)
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(CratesColor.accent)
-                Spacer()
+        VStack(alignment: .leading, spacing: 8) {
+            CrateMosaic(coverIDs: coverIDs, kindSymbol: crate.symbol)
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(.rect(cornerRadius: Self.radius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
+                        .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+                )
+            VStack(alignment: .leading, spacing: 1) {
+                Text(crate.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
                 if let n = crate.tuneCount {
-                    Text("\(n)")
-                        .font(.caption.monospacedDigit())
+                    Text("\(n) tunes")
+                        .font(.caption)
                         .foregroundStyle(CratesColor.textSecondary)
                 }
             }
-            Spacer(minLength: 8)
-            Text(crate.name)
-                .font(.callout.weight(.semibold))
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-        .background(CratesColor.surface, in: .rect(cornerRadius: 22, style: .continuous))
+    }
+}
+
+/// Fallback ladder: 4+ covers → 2×2 mosaic; 1–3 → single full-bleed cover (a partial mosaic
+/// reads as a loading failure); 0 → kind symbol on a quiet fill (textSecondary, never accent).
+struct CrateMosaic: View {
+    let coverIDs: [Int64]
+    let kindSymbol: String
+
+    var body: some View {
+        if coverIDs.count >= 4 {
+            Grid(horizontalSpacing: 1, verticalSpacing: 1) {
+                GridRow {
+                    cell(coverIDs[0])
+                    cell(coverIDs[1])
+                }
+                GridRow {
+                    cell(coverIDs[2])
+                    cell(coverIDs[3])
+                }
+            }
+        } else if let first = coverIDs.first {
+            cell(first)
+        } else {
+            ZStack {
+                Rectangle().fill(CratesColor.surface)
+                Image(systemName: kindSymbol)
+                    .font(.system(size: 40, weight: .regular))
+                    .foregroundStyle(CratesColor.textSecondary)
+            }
+        }
+    }
+
+    private func cell(_ coverID: Int64) -> some View {
+        Color.clear.overlay(CoverImage(coverID: coverID)).clipped()
     }
 }
 

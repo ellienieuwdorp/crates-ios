@@ -90,19 +90,28 @@ final class LibraryStore {
         var crate: Crate
         /// Ancestor breadcrumb, e.g. "Collection › Techno" — empty for roots.
         var path: String
+        /// First 4 distinct subtree cover IDs (Home mosaic tiles). Optional so pre-round-4
+        /// cached indexes still decode; refreshed by the next sync.
+        var previewCoverIDs: [Int64]? = nil
         var id: Int64 { crate.id }
     }
 
     private(set) var crateByID: [Int64: Crate] = [:]
     private(set) var crateIndex: [CrateIndexEntry] = []
     private var crateKeys: [String] = []
+    private var previewCoversByCrate: [Int64: [Int64]] = [:]
 
     func crate(byID id: Int64) -> Crate? { crateByID[id] }
+    /// Mosaic covers for a crate tile (empty = symbol fallback).
+    func previewCoverIDs(for crateID: Int64) -> [Int64] { previewCoversByCrate[crateID] ?? [] }
 
     private func setCrateIndex(_ entries: [CrateIndexEntry]) {
         crateIndex = entries
         crateByID = Dictionary(entries.map { ($0.crate.id, $0.crate) }, uniquingKeysWith: { a, _ in a })
         crateKeys = entries.map { Self.fold("\($0.crate.name) \($0.path)") }
+        previewCoversByCrate = Dictionary(
+            entries.compactMap { e in e.previewCoverIDs.map { (e.crate.id, $0) } },
+            uniquingKeysWith: { a, _ in a })
     }
 
     /// Token-AND crate search over name+path, name-prefix ranked first. Cap 50.
@@ -124,19 +133,20 @@ final class LibraryStore {
     /// Flatten the tree into breadcrumbed entries (BFS from roots; orphans get an empty path).
     private static func buildCrateIndex(roots: [Crate],
                                         children: [Int64: [Crate]],
-                                        all: [Int64: Crate]) -> [CrateIndexEntry] {
+                                        all: [Int64: Crate],
+                                        previews: [Int64: [Int64]] = [:]) -> [CrateIndexEntry] {
         var entries: [CrateIndexEntry] = []
         var visited = Set<Int64>()
         var queue: [(Crate, String)] = roots.map { ($0, "") }
         while !queue.isEmpty {
             let (crate, path) = queue.removeFirst()
             guard visited.insert(crate.id).inserted else { continue }
-            entries.append(CrateIndexEntry(crate: crate, path: path))
+            entries.append(CrateIndexEntry(crate: crate, path: path, previewCoverIDs: previews[crate.id]))
             let childPath = path.isEmpty ? crate.name : "\(path) › \(crate.name)"
             for child in children[crate.id] ?? [] { queue.append((child, childPath)) }
         }
         for (id, crate) in all where !visited.contains(id) {
-            entries.append(CrateIndexEntry(crate: crate, path: ""))
+            entries.append(CrateIndexEntry(crate: crate, path: "", previewCoverIDs: previews[id]))
         }
         return entries
     }
@@ -175,8 +185,14 @@ final class LibraryStore {
         // Demo search corpus: dedupe the per-crate lists by id.
         var seen = Set<Int64>()
         setAllTunes(tunesByCrate.values.flatMap { $0 }.filter { seen.insert($0.id).inserted })
+        var demoPreviews: [Int64: [Int64]] = [:]
+        for (crateID, ts) in tunesByCrate {
+            let covers = ts.prefix(8).compactMap(\.coverID)
+            if !covers.isEmpty { demoPreviews[crateID] = Array(covers.prefix(4)) }
+        }
         setCrateIndex(Self.buildCrateIndex(roots: crates, children: childrenByCrate,
-                                           all: Dictionary(crates.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })))
+                                           all: Dictionary(crates.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }),
+                                           previews: demoPreviews))
     }
 
     /// Populate the whole library from a synced backup snapshot (the real onboarding path) and
@@ -194,7 +210,8 @@ final class LibraryStore {
         setAllTunes(snapshot.allTunes)
         setCrateIndex(Self.buildCrateIndex(roots: snapshot.rootCrates,
                                            children: snapshot.childrenByCrate,
-                                           all: snapshot.allCratesByID))
+                                           all: snapshot.allCratesByID,
+                                           previews: snapshot.previewCoverIDsByCrate))
 
         // Persist snapshot pieces so the next launch renders from disk before any network call.
         let roots = snapshot.rootCrates, recents = recentCrates
