@@ -36,7 +36,7 @@ struct RootView: View {
                 BrowseView().miniPlayerClearance()
             }
             Tab(value: AppTab.search, role: .search) {
-                SearchView().miniPlayerClearance()
+                SearchView(selectedTab: selection).miniPlayerClearance()
             }
         }
     }

@@ -28,12 +28,9 @@ struct LibraryAPI {
         try await client.get("tunes/crates/\(crateID)", as: [Tune].self)
     }
 
-    /// Basic tune search.
-    func searchTunes(_ query: String) async throws -> [Tune] {
-        try await client.get("search/tunes/basic",
-                             query: [URLQueryItem(name: "query", value: query)],
-                             as: [Tune].self)
-    }
+    // Remote search removed (dogfood round 3, item 8): /search/tunes/basic is deprecated,
+    // Lucene-backed (bare substrings match nothing), and the whole library is local anyway —
+    // LibraryStore.searchTunes is the search path.
 
     /// Available audio-source types, for resolving `defaultAudioSourceType` → TrackSource.
     func audioSourceTypes() async throws -> [AudioSourceType] {

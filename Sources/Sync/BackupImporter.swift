@@ -128,6 +128,9 @@ enum BackupImporter {
             childrenByCrate: childrenByCrate,
             tunesByCrate: tunesByCrate,
             allCratesByID: crateByID,
+            allTunes: tunesByID.values.sorted {
+                $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending
+            },
             tuneCount: tunesByID.count
         )
     }

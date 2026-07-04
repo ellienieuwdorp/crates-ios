@@ -22,7 +22,6 @@ struct NowPlayingView: View {
     /// Measured height of the hugging collapsed stack — drives the collapsed detent. Seeded
     /// with a realistic value so the first frame doesn't flash a sliver-height sheet.
     @State private var collapsedHeight: CGFloat = 560
-    @Namespace private var artNamespace
 
     private let inset: CGFloat = 24
 
@@ -45,7 +44,7 @@ struct NowPlayingView: View {
     var body: some View {
         Group {
             if let tune = player.current {
-                if queueExpanded { expandedLayout(tune) } else { collapsedLayout(tune) }
+                playerLayout(tune)
             } else {
                 ContentUnavailableView("Nothing playing", systemImage: "music.note")
             }
@@ -54,39 +53,68 @@ struct NowPlayingView: View {
         .presentationDragIndicator(.visible)
     }
 
-    // MARK: - Collapsed: content-hugging stack
+    // MARK: - One layout for both detents
+    //
+    // A single tree whose header morphs — never an if/else branch swap. Two view identities
+    // linked by matchedGeometryEffect can't hero-morph while UIKit animates the sheet's own
+    // coordinate space (stale anchors, double artwork, placeholder flashes — dogfood round 3,
+    // W2). With one Artwork and stable scrubber/transport/list identities, the only SwiftUI-
+    // animated deltas are small local motions; the detent animation carries the rest.
 
-    private func collapsedLayout(_ tune: Tune) -> some View {
+    private func playerLayout(_ tune: Tune) -> some View {
         VStack(spacing: 0) {
-            Artwork(tune: tune, size: 264)
-                .matchedGeometryEffect(id: "art", in: artNamespace)
-                .shadow(color: .black.opacity(0.22), radius: 20, y: 10)
-                .padding(.top, 28) // clears the system drag indicator
+            VStack(spacing: 0) {
+                morphingHeader(tune)
+                    .padding(.top, queueExpanded ? 24 : 28)
+                scrubber
+                    .padding(.top, queueExpanded ? 16 : 20)
+                transport
+                    .padding(.top, queueExpanded ? 8 : 12)
+                queueHandle
+                    .padding(.top, queueExpanded ? 12 : 16)
+                    .padding(.bottom, queueExpanded ? 0 : 4)
+            }
+            .padding(.horizontal, inset)
+            .frame(maxWidth: .infinity)
+            .fixedSize(horizontal: false, vertical: true) // hug intrinsic height for measurement
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                guard !queueExpanded else { return } // only the collapsed shape defines the detent
+                let measured = height.rounded(.up)
+                guard abs(measured - collapsedHeight) >= 1 else { return } // ignore float jitter
+                // Animate so content growth (title wrap, error line) resizes the sheet
+                // smoothly instead of snapping a frame later.
+                withAnimation(.snappy(duration: 0.3)) { collapsedHeight = measured }
+            }
 
-            titleBlock(tune)
-                .padding(.top, 20)
-
-            scrubber
-                .padding(.top, 20)
-
-            transport
-                .padding(.top, 12)
-
-            queueHandle
-                .padding(.top, 16)
-                .padding(.bottom, 4)
-        }
-        .padding(.horizontal, inset)
-        .frame(maxWidth: .infinity)
-        .fixedSize(horizontal: false, vertical: true) // hug intrinsic height for measurement
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-            let measured = height.rounded(.up)
-            guard abs(measured - collapsedHeight) >= 1 else { return } // ignore float jitter
-            // Animate so content growth (title wrap, error line) resizes the sheet smoothly
-            // instead of snapping a frame later.
-            withAnimation(.snappy(duration: 0.3)) { collapsedHeight = measured }
+            queueList
+                .allowsHitTesting(queueExpanded) // clipped below the fold when collapsed
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// The one Artwork, morphing 264↔64 inside an AnyLayout (VStack under ↔ HStack beside);
+    /// the two text blocks cross-fade in place (both always laid out, so the header height
+    /// never snaps at transition end).
+    private func morphingHeader(_ tune: Tune) -> some View {
+        let layout = queueExpanded
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: 12))
+            : AnyLayout(VStackLayout(spacing: 16))
+        return layout {
+            Artwork(tune: tune, size: queueExpanded ? 64 : 264)
+                .shadow(color: .black.opacity(queueExpanded ? 0.12 : 0.22),
+                        radius: queueExpanded ? 8 : 20, y: queueExpanded ? 4 : 10)
+            ZStack(alignment: .leading) {
+                titleBlock(tune)
+                    .frame(maxWidth: .infinity)
+                    .opacity(queueExpanded ? 0 : 1)
+                    .accessibilityHidden(queueExpanded)
+                compactTitles(tune)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .opacity(queueExpanded ? 1 : 0)
+                    .accessibilityHidden(!queueExpanded)
+            }
+        }
+        .geometryGroup()
     }
 
     private func titleBlock(_ tune: Tune) -> some View {
@@ -120,51 +148,23 @@ struct NowPlayingView: View {
             .joined(separator: " · ")
     }
 
-    // MARK: - Expanded: compact header + queue
-
-    private func expandedLayout(_ tune: Tune) -> some View {
-        VStack(spacing: 0) {
-            compactHeader(tune)
-                .padding(.top, 24)
-                .padding(.horizontal, inset)
-
-            scrubber
-                .padding(.top, 16)
-                .padding(.horizontal, inset)
-
-            transport
-                .padding(.top, 8)
-                .padding(.horizontal, inset)
-
-            queueHandle
-                .padding(.top, 12)
-                .padding(.horizontal, inset)
-
-            queueList
-        }
-    }
-
-    private func compactHeader(_ tune: Tune) -> some View {
-        HStack(spacing: 12) {
-            Artwork(tune: tune, size: 64)
-                .matchedGeometryEffect(id: "art", in: artNamespace)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tune.displayTitle).font(.headline).lineLimit(1)
-                HStack(spacing: 6) {
-                    SourceBadge(source: tune.source)
-                    Text(tune.displayArtist).font(.subheadline)
-                        .foregroundStyle(CratesColor.textSecondary).lineLimit(1)
-                }
-                if let error = player.playbackError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(CratesColor.red)
-                        .lineLimit(2) // the error is the one line that must stay readable
-                } else if !metaText(tune).isEmpty {
-                    Text(metaText(tune))
-                        .font(.caption).foregroundStyle(CratesColor.textSecondary).lineLimit(1)
-                }
+    /// Text-only compact block (art lives in morphingHeader).
+    private func compactTitles(_ tune: Tune) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(tune.displayTitle).font(.headline).lineLimit(1)
+            HStack(spacing: 6) {
+                SourceBadge(source: tune.source)
+                Text(tune.displayArtist).font(.subheadline)
+                    .foregroundStyle(CratesColor.textSecondary).lineLimit(1)
             }
-            Spacer(minLength: 0)
+            if let error = player.playbackError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(CratesColor.red)
+                    .lineLimit(2) // the error is the one line that must stay readable
+            } else if !metaText(tune).isEmpty {
+                Text(metaText(tune))
+                    .font(.caption).foregroundStyle(CratesColor.textSecondary).lineLimit(1)
+            }
         }
     }
 

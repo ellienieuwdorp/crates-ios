@@ -44,6 +44,46 @@ final class LibraryStore {
         isDemoBacked = false
     }
 
+    // MARK: - Local search (the whole library is on-device; search never touches the network)
+
+    private(set) var allTunes: [Tune] = []
+    private var searchKeys: [(all: String, title: String, artist: String)] = []
+
+    /// Install the flat library used by search and rebuild the folded-key index
+    /// (~2k tunes → a few ms, fine on the main actor).
+    func setAllTunes(_ tunes: [Tune]) {
+        allTunes = tunes
+        searchKeys = tunes.map {
+            (all: Self.fold("\($0.title) \($0.artist) \($0.album)"),
+             title: Self.fold($0.displayTitle),
+             artist: Self.fold($0.displayArtist))
+        }
+    }
+
+    /// Ranked, case/diacritic-insensitive token-AND search: every query token must appear
+    /// somewhere; title-prefix beats title-contains beats artist-prefix. Results cap at 200.
+    func searchTunes(_ query: String) -> [Tune] {
+        let tokens = Self.fold(query).split(separator: " ").map(String.init)
+        guard !tokens.isEmpty else { return [] }
+        var scored: [(score: Int, index: Int)] = []
+        for (i, key) in searchKeys.enumerated() {
+            guard tokens.allSatisfy({ key.all.contains($0) }) else { continue }
+            let first = tokens[0]
+            let score: Int = key.title.hasPrefix(first) ? 3
+                : key.title.contains(first) ? 2
+                : key.artist.hasPrefix(first) ? 1 : 0
+            scored.append((score, i))
+        }
+        return scored
+            .sorted { $0.score != $1.score ? $0.score > $1.score : $0.index < $1.index }
+            .prefix(200)
+            .map { allTunes[$0.index] }
+    }
+
+    private static func fold(_ s: String) -> String {
+        s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).lowercased()
+    }
+
     /// Inject representative data for demo mode (no server). Marks everything `.live` so the UI
     /// looks settled rather than perpetually "updating".
     func loadDemoData(_ crates: [Crate], tunesByCrate: [Int64: [Tune]]) {
@@ -54,6 +94,9 @@ final class LibraryStore {
         self.tunesByCrate = tunesByCrate
         rootState = .live
         for id in tunesByCrate.keys { crateState[id] = .live }
+        // Demo search corpus: dedupe the per-crate lists by id.
+        var seen = Set<Int64>()
+        setAllTunes(tunesByCrate.values.flatMap { $0 }.filter { seen.insert($0.id).inserted })
     }
 
     /// Populate the whole library from a synced backup snapshot (the real onboarding path) and
@@ -68,12 +111,16 @@ final class LibraryStore {
         rootState = .live
         for id in snapshot.tunesByCrate.keys { crateState[id] = .live }
 
+        setAllTunes(snapshot.allTunes)
+
         // Persist snapshot pieces so the next launch renders from disk before any network call.
         let roots = snapshot.rootCrates, recents = recentCrates
         let children = snapshot.childrenByCrate, tunes = snapshot.tunesByCrate
+        let all = snapshot.allTunes
         Task.detached {
             await DiskCache.shared.save(roots, key: "root_crates")
             await DiskCache.shared.save(recents, key: "recent_crates")
+            await DiskCache.shared.save(all, key: "all_tunes")
             for (id, kids) in children { await DiskCache.shared.save(kids, key: "children_\(id)") }
             for (id, ts) in tunes { await DiskCache.shared.save(ts, key: "tunes_\(id)") }
         }
@@ -86,6 +133,9 @@ final class LibraryStore {
         }
         if let r: [Crate] = await DiskCache.shared.load("recent_crates", as: [Crate].self) {
             recentCrates = r
+        }
+        if let all: [Tune] = await DiskCache.shared.load("all_tunes", as: [Tune].self) {
+            setAllTunes(all)
         }
     }
 

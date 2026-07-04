@@ -94,5 +94,9 @@ struct LibrarySnapshot: Sendable {
     var childrenByCrate: [Int64: [Crate]]   // parent → ordered children
     var tunesByCrate: [Int64: [Tune]]       // crate → ordered tunes
     var allCratesByID: [Int64: Crate]
+    /// Every imported tune, title-sorted — the local search corpus. A flat collection is
+    /// required: tunesByCrate is only lazily hydrated after cold start, so scanning it would
+    /// silently search nothing.
+    var allTunes: [Tune]
     var tuneCount: Int
 }

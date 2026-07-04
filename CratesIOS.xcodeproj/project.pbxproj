@@ -12,6 +12,7 @@
 		09455B2D9665BA4299494BDB /* FlexibleDecoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA3007968BFC91BE832DC137 /* FlexibleDecoding.swift */; };
 		1322D72D6871E728D5CC00CF /* PairingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5590BFD231D4DB927376F744 /* PairingService.swift */; };
 		249E458654888EE2C8BAE646 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20312628F250ED01FCC6CE9 /* RootView.swift */; };
+		254B263F7452CC17BD027798 /* RecentSearches.swift in Sources */ = {isa = PBXBuildFile; fileRef = 040A9DAFF20006CF83CB22EE /* RecentSearches.swift */; };
 		2C3DA8211F82FD862B5D00BC /* LivePairingTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97A148B98248F4F4CBFAE43 /* LivePairingTest.swift */; };
 		358CF6AA3D432B6FBEC46AEC /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B52175EEB07FE9E3CDA89BE /* LibraryStore.swift */; };
 		37B6B5FEA9BDA8D502829F75 /* CratesConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C04C2F4BAF6E99DB006C6D3 /* CratesConnection.swift */; };
@@ -31,6 +32,7 @@
 		855017B1ECF71EDEE6BCD137 /* RetentionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34C7F1285927AD30655C234 /* RetentionPolicyTests.swift */; };
 		85F7DAD971FA4C61B56356ED /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E4FCCE7FC3E804EA3B1C16 /* SampleData.swift */; };
 		8DBAF9E08293DCC21C862AB0 /* RealLibraryShotTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */; };
+		9692C1262D590412FF9C7EED /* LocalSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */; };
 		975E9FC507364503B7859291 /* BackupImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 195A3F980802D97CF3E62D69 /* BackupImporter.swift */; };
 		984BCB0CA1D98D5FAED7AE50 /* QueueLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF28E3976FF11B2DAAAC3BD /* QueueLogicTests.swift */; };
 		A08673CF1D78AB184D310346 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3798CA86619F933E48240037 /* PlaybackController.swift */; };
@@ -70,6 +72,7 @@
 
 /* Begin PBXFileReference section */
 		01C639DEEBCB4351FFA0C70B /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		040A9DAFF20006CF83CB22EE /* RecentSearches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentSearches.swift; sourceTree = "<group>"; };
 		0AA50F05EEABD9FC9A000343 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealLibraryShotTest.swift; sourceTree = "<group>"; };
 		0DBF48485281E435434369C0 /* TrackRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackRow.swift; sourceTree = "<group>"; };
@@ -99,6 +102,7 @@
 		79138C52D1C29791E4570485 /* BackupImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupImporterTests.swift; sourceTree = "<group>"; };
 		79E64303002837CAA4E1D955 /* CratesIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CratesIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		82E512AF12151A31692C31BA /* Tune.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tune.swift; sourceTree = "<group>"; };
+		891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSearchTests.swift; sourceTree = "<group>"; };
 		9531702C1597A6D684CAB237 /* Crate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crate.swift; sourceTree = "<group>"; };
 		9FE5ACC091E29F4EC940BBFB /* DownloadPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPolicyView.swift; sourceTree = "<group>"; };
 		A0B0D37223E35F3E60E14B6B /* LivePlayTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePlayTest.swift; sourceTree = "<group>"; };
@@ -195,6 +199,7 @@
 			children = (
 				79138C52D1C29791E4570485 /* BackupImporterTests.swift */,
 				45684C62CA4C37C2E03DDBE7 /* DecodingTests.swift */,
+				891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */,
 				700EA676F979A703F57D16E1 /* PairingAndConnectionTests.swift */,
 				CCF28E3976FF11B2DAAAC3BD /* QueueLogicTests.swift */,
 				E34C7F1285927AD30655C234 /* RetentionPolicyTests.swift */,
@@ -300,6 +305,7 @@
 		CA325582B6655AE3B8FE3CC8 /* Search */ = {
 			isa = PBXGroup;
 			children = (
+				040A9DAFF20006CF83CB22EE /* RecentSearches.swift */,
 				2831DF324E73C40736A0907D /* SearchView.swift */,
 			);
 			path = Search;
@@ -491,6 +497,7 @@
 				1322D72D6871E728D5CC00CF /* PairingService.swift in Sources */,
 				A08673CF1D78AB184D310346 /* PlaybackController.swift in Sources */,
 				7FD5D644AE52B066CB334045 /* QueueView.swift in Sources */,
+				254B263F7452CC17BD027798 /* RecentSearches.swift in Sources */,
 				249E458654888EE2C8BAE646 /* RootView.swift in Sources */,
 				85F7DAD971FA4C61B56356ED /* SampleData.swift in Sources */,
 				B903A9952F2E74222545585F /* SearchView.swift in Sources */,
@@ -508,6 +515,7 @@
 			files = (
 				C4BB6F3E37A22A7CFB37978E /* BackupImporterTests.swift in Sources */,
 				CE522E480E702CE5219AFC11 /* DecodingTests.swift in Sources */,
+				9692C1262D590412FF9C7EED /* LocalSearchTests.swift in Sources */,
 				3A233EE9BF91FB17D855A02F /* PairingAndConnectionTests.swift in Sources */,
 				984BCB0CA1D98D5FAED7AE50 /* QueueLogicTests.swift in Sources */,
 				855017B1ECF71EDEE6BCD137 /* RetentionPolicyTests.swift in Sources */,
