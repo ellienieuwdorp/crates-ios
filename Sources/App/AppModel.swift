@@ -55,8 +55,9 @@ final class AppModel {
 
     private func wire() {
         library.attach(client: client)
-        downloads.attach(client: client)
+        downloads.attach(client: client, connection: connection)
         player.attach(connection: connection, downloads: downloads)
+        downloads.nowPlayingTuneID = { [weak player] in player?.current?.id }
         let conn = connection
         Task { await ArtworkStore.shared.update(connection: conn) }
     }
@@ -145,6 +146,7 @@ final class AppModel {
         persistSyncArtifacts(result)
         UserDefaults.standard.set(Date(), forKey: AppModel.lastSyncKey)
         player.pruneDeletedTunes(valid: Set(result.snapshot.allTunes.map(\.id)))
+        downloads.reconcileAll(tunesByCrate: result.snapshot.tunesByCrate)
         if !quiet { onboarding = .syncing("Done — \(result.snapshot.tuneCount) tunes", 1.0) }
     }
 
@@ -182,6 +184,7 @@ final class AppModel {
             persistSyncArtifacts(result, previousCursor: cursor)
             UserDefaults.standard.set(Date(), forKey: AppModel.lastSyncKey)
             player.pruneDeletedTunes(valid: Set(result.snapshot.allTunes.map(\.id)))
+            downloads.reconcileAll(tunesByCrate: result.snapshot.tunesByCrate)
             if !result.changedCoverIDs.isEmpty {
                 let changed = result.changedCoverIDs
                 Task.detached { await ArtworkStore.shared.invalidate(coverIDs: changed) }

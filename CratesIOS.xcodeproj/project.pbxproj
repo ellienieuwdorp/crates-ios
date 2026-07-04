@@ -11,6 +11,8 @@
 		01F70939F5DB3896806BEEAD /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = A1D97B01254F4A2407584B9C /* ZIPFoundation */; };
 		09455B2D9665BA4299494BDB /* FlexibleDecoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA3007968BFC91BE832DC137 /* FlexibleDecoding.swift */; };
 		1322D72D6871E728D5CC00CF /* PairingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5590BFD231D4DB927376F744 /* PairingService.swift */; };
+		193D3BA1739A96CDAF4CFCE2 /* DownloadTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C53A00C491E2EBE88B90FC /* DownloadTransport.swift */; };
+		248C47C3620CD02839641615 /* LiveDownloadTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB0525955F8F477948F18C4 /* LiveDownloadTest.swift */; };
 		249E458654888EE2C8BAE646 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20312628F250ED01FCC6CE9 /* RootView.swift */; };
 		254B263F7452CC17BD027798 /* RecentSearches.swift in Sources */ = {isa = PBXBuildFile; fileRef = 040A9DAFF20006CF83CB22EE /* RecentSearches.swift */; };
 		2BF1942268CE811AEB47E24D /* DeltaMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A32601A1D3E54C34BD5D25B /* DeltaMergeTests.swift */; };
@@ -37,6 +39,7 @@
 		855017B1ECF71EDEE6BCD137 /* RetentionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34C7F1285927AD30655C234 /* RetentionPolicyTests.swift */; };
 		85F7DAD971FA4C61B56356ED /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E4FCCE7FC3E804EA3B1C16 /* SampleData.swift */; };
 		8DBAF9E08293DCC21C862AB0 /* RealLibraryShotTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */; };
+		8E96EAEE473344519223A6C3 /* DownloadEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2D1986C9F3800CB666E437 /* DownloadEngineTests.swift */; };
 		9692C1262D590412FF9C7EED /* LocalSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */; };
 		975E9FC507364503B7859291 /* BackupImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 195A3F980802D97CF3E62D69 /* BackupImporter.swift */; };
 		984BCB0CA1D98D5FAED7AE50 /* QueueLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF28E3976FF11B2DAAAC3BD /* QueueLogicTests.swift */; };
@@ -78,12 +81,14 @@
 /* Begin PBXFileReference section */
 		01C639DEEBCB4351FFA0C70B /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		040A9DAFF20006CF83CB22EE /* RecentSearches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentSearches.swift; sourceTree = "<group>"; };
+		09C53A00C491E2EBE88B90FC /* DownloadTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadTransport.swift; sourceTree = "<group>"; };
 		0AA50F05EEABD9FC9A000343 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealLibraryShotTest.swift; sourceTree = "<group>"; };
 		0DBF48485281E435434369C0 /* TrackRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackRow.swift; sourceTree = "<group>"; };
 		10EE6A4CBF5B548805D8898C /* CratesUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CratesUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		195A3F980802D97CF3E62D69 /* BackupImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupImporter.swift; sourceTree = "<group>"; };
 		1C04C2F4BAF6E99DB006C6D3 /* CratesConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CratesConnection.swift; sourceTree = "<group>"; };
+		1D2D1986C9F3800CB666E437 /* DownloadEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadEngineTests.swift; sourceTree = "<group>"; };
 		1DAD74794E0348CC7FEADF05 /* UsageLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageLog.swift; sourceTree = "<group>"; };
 		23A5DB3C19790895966764C4 /* ArtworkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStore.swift; sourceTree = "<group>"; };
 		2606D172B067F38F78F7B3AB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -119,6 +124,7 @@
 		A456A4D9CBF7C3EB501DC039 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
 		B97A148B98248F4F4CBFAE43 /* LivePairingTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePairingTest.swift; sourceTree = "<group>"; };
 		CCF28E3976FF11B2DAAAC3BD /* QueueLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueLogicTests.swift; sourceTree = "<group>"; };
+		CDB0525955F8F477948F18C4 /* LiveDownloadTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDownloadTest.swift; sourceTree = "<group>"; };
 		D20312628F250ED01FCC6CE9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		D228099FC10A72EE275DE786 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D48276B96A37B5A810C48BC1 /* SyncClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncClient.swift; sourceTree = "<group>"; };
@@ -175,6 +181,7 @@
 		3A4B86ABF5625A0DDBBE11BB /* CratesUITests */ = {
 			isa = PBXGroup;
 			children = (
+				CDB0525955F8F477948F18C4 /* LiveDownloadTest.swift */,
 				B97A148B98248F4F4CBFAE43 /* LivePairingTest.swift */,
 				A0B0D37223E35F3E60E14B6B /* LivePlayTest.swift */,
 				0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */,
@@ -211,6 +218,7 @@
 				79138C52D1C29791E4570485 /* BackupImporterTests.swift */,
 				45684C62CA4C37C2E03DDBE7 /* DecodingTests.swift */,
 				5A32601A1D3E54C34BD5D25B /* DeltaMergeTests.swift */,
+				1D2D1986C9F3800CB666E437 /* DownloadEngineTests.swift */,
 				891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */,
 				700EA676F979A703F57D16E1 /* PairingAndConnectionTests.swift */,
 				CCF28E3976FF11B2DAAAC3BD /* QueueLogicTests.swift */,
@@ -311,6 +319,7 @@
 			isa = PBXGroup;
 			children = (
 				542036AF865588D8EF429107 /* DownloadManager.swift */,
+				09C53A00C491E2EBE88B90FC /* DownloadTransport.swift */,
 				3798CA86619F933E48240037 /* PlaybackController.swift */,
 			);
 			path = Player;
@@ -504,6 +513,7 @@
 				D6F3E8297D040DF4818BE7C6 /* DiskCache.swift in Sources */,
 				CD4D6D65B9CE169C6476DF15 /* DownloadManager.swift in Sources */,
 				DE69C9B1BE580D57745B3545 /* DownloadPolicyView.swift in Sources */,
+				193D3BA1739A96CDAF4CFCE2 /* DownloadTransport.swift in Sources */,
 				09455B2D9665BA4299494BDB /* FlexibleDecoding.swift in Sources */,
 				5C8DD24CD5F42111CD4C8A9A /* HomePins.swift in Sources */,
 				D120CFD0C2A35776C6DCFC85 /* HomeView.swift in Sources */,
@@ -534,6 +544,7 @@
 				C4BB6F3E37A22A7CFB37978E /* BackupImporterTests.swift in Sources */,
 				CE522E480E702CE5219AFC11 /* DecodingTests.swift in Sources */,
 				2BF1942268CE811AEB47E24D /* DeltaMergeTests.swift in Sources */,
+				8E96EAEE473344519223A6C3 /* DownloadEngineTests.swift in Sources */,
 				9692C1262D590412FF9C7EED /* LocalSearchTests.swift in Sources */,
 				3A233EE9BF91FB17D855A02F /* PairingAndConnectionTests.swift in Sources */,
 				984BCB0CA1D98D5FAED7AE50 /* QueueLogicTests.swift in Sources */,
@@ -546,6 +557,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				248C47C3620CD02839641615 /* LiveDownloadTest.swift in Sources */,
 				2C3DA8211F82FD862B5D00BC /* LivePairingTest.swift in Sources */,
 				616BD4C3957217B27F137B53 /* LivePlayTest.swift in Sources */,
 				8DBAF9E08293DCC21C862AB0 /* RealLibraryShotTest.swift in Sources */,

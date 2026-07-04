@@ -12,6 +12,7 @@ struct TrackRow: View {
     var onTap: () -> Void = {}
 
     @Environment(PlaybackController.self) private var player
+    @Environment(DownloadManager.self) private var downloads
     @State private var lastAction: QueueAction? = nil
     @State private var feedbackTrigger = 0
 
@@ -82,6 +83,17 @@ struct TrackRow: View {
                 Label("Play Next", systemImage: "text.insert")
             }
             .tint(CratesColor.accentDeep)
+        }
+        .contextMenu {
+            if isDownloaded {
+                Button(role: .destructive) { downloads.removeDownload(tune.id) } label: {
+                    Label("Remove Download", systemImage: "trash")
+                }
+            } else if tune.hasServerAudio != false {
+                Button { downloads.downloadTune(tune) } label: {
+                    Label("Download", systemImage: "arrow.down.circle")
+                }
+            }
         }
         .sensoryFeedback(.success, trigger: feedbackTrigger)
         .overlay(alignment: .trailing) {
