@@ -57,6 +57,8 @@ final class AppModel {
         library.attach(client: client)
         downloads.attach(client: client)
         player.attach(connection: connection, downloads: downloads)
+        let conn = connection
+        Task { await ArtworkStore.shared.update(connection: conn) }
     }
 
     func bootstrap() async {
@@ -171,6 +173,10 @@ final class AppModel {
             library.loadSnapshot(result.snapshot)
             persistSyncArtifacts(result, previousCursor: cursor)
             UserDefaults.standard.set(Date(), forKey: AppModel.lastSyncKey)
+            if !result.changedCoverIDs.isEmpty {
+                let changed = result.changedCoverIDs
+                Task.detached { await ArtworkStore.shared.invalidate(coverIDs: changed) }
+            }
         } catch {
             if case CratesAPIError.http(400) = error {
                 // Server rejected the cursor — drop it; the next attempt reseeds via full sync.
@@ -198,11 +204,19 @@ final class AppModel {
 
     func dismissOnboarding() { onboarding = .idle }
 
+    /// Trickle the full cover corpus (~112MB measured) into the art cache — makes the whole
+    /// library render offline. Cache-first philosophy: the cache IS the app.
+    func warmAllArtwork() {
+        let ids = Array(Set(library.allTunes.compactMap(\.coverID)))
+        ArtworkStore.shared.prefetch(coverIDs: ids, variant: .row)
+    }
+
     func signOut() {
         player.stop()
         connection = CratesConnection(host: "", port: CratesConnection.defaultPort, token: "")
         UserDefaults.standard.removeObject(forKey: AppModel.connKey)
         UserDefaults.standard.removeObject(forKey: AppModel.cursorKey) // next pairing starts with a full sync
+        Task { await ArtworkStore.shared.clear() } // the previous server's art goes with its token
         Task { await client.update(connection: connection) }
         wire() // player/downloads must drop the stale host + bearer token immediately
     }

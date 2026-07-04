@@ -36,8 +36,13 @@ struct CratesConnection: Sendable, Equatable, Codable {
 
     func streamURL(tuneID: Int64) -> URL? { url(path: "stream/\(tuneID)") }
 
-    func coverURL(coverID: Int64, size: Int? = nil) -> URL? {
-        let q = size.map { [URLQueryItem(name: "size", value: String($0))] } ?? []
+    /// `?size=` accepts ONLY "thumb" (100×100, best-effort — silently returns the original
+    /// when no pre-generated thumbnail exists) and "original". Integer sizes are rejected with
+    /// HTTP 400 (verified live 2026-07-04) — the OpenAPI spec is wrong here, as it was about auth.
+    enum CoverSize: String, Sendable { case original, thumb }
+
+    func coverURL(coverID: Int64, size: CoverSize? = nil) -> URL? {
+        let q = size.map { [URLQueryItem(name: "size", value: $0.rawValue)] } ?? []
         return url(path: "covers/byCoverID/\(coverID)", query: q)
     }
 

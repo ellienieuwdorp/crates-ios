@@ -20,6 +20,7 @@
 		37B6B5FEA9BDA8D502829F75 /* CratesConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C04C2F4BAF6E99DB006C6D3 /* CratesConnection.swift */; };
 		3A233EE9BF91FB17D855A02F /* PairingAndConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700EA676F979A703F57D16E1 /* PairingAndConnectionTests.swift */; };
 		3F630BAE5489C3071CC41368 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AA50F05EEABD9FC9A000343 /* SettingsView.swift */; };
+		40AEC920447730E4ABE5BFAB /* ArtworkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A5DB3C19790895966764C4 /* ArtworkStore.swift */; };
 		4B45CD003D64C5143B18353A /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A456A4D9CBF7C3EB501DC039 /* BrowseView.swift */; };
 		4BCC4D71EDEA4A5F21AEF965 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4659819F5C7E80A983E315C9 /* SmokeTests.swift */; };
 		4BD03C3563838B89F02AD95B /* SyncClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48276B96A37B5A810C48BC1 /* SyncClient.swift */; };
@@ -83,6 +84,7 @@
 		195A3F980802D97CF3E62D69 /* BackupImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupImporter.swift; sourceTree = "<group>"; };
 		1C04C2F4BAF6E99DB006C6D3 /* CratesConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CratesConnection.swift; sourceTree = "<group>"; };
 		1DAD74794E0348CC7FEADF05 /* UsageLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageLog.swift; sourceTree = "<group>"; };
+		23A5DB3C19790895966764C4 /* ArtworkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkStore.swift; sourceTree = "<group>"; };
 		2606D172B067F38F78F7B3AB /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		265AC6E2D2D59755C2EE33D6 /* CratesTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CratesTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		27719C50510D1DACDCA93C88 /* LibraryAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryAPI.swift; sourceTree = "<group>"; };
@@ -284,6 +286,7 @@
 			isa = PBXGroup;
 			children = (
 				6BF0C39026FFC092EAE7BF08 /* Artwork.swift */,
+				23A5DB3C19790895966764C4 /* ArtworkStore.swift */,
 				75CDC4BE75A96D0E25D292BB /* CratesTheme.swift */,
 				0DBF48485281E435434369C0 /* TrackRow.swift */,
 			);
@@ -486,6 +489,7 @@
 			files = (
 				018258CC606FAC335BB61784 /* AppModel.swift in Sources */,
 				E73E8EDDF4129602F3226569 /* Artwork.swift in Sources */,
+				40AEC920447730E4ABE5BFAB /* ArtworkStore.swift in Sources */,
 				975E9FC507364503B7859291 /* BackupImporter.swift in Sources */,
 				D710B886D5C798830C043D6D /* BackupModels.swift in Sources */,
 				4B45CD003D64C5143B18353A /* BrowseView.swift in Sources */,

@@ -28,6 +28,10 @@ enum BackupImporter {
         /// Lexicographic max of every DateLastModified/DateModified stamp seen in the payload's
         /// filtered tables — the server's own clock, never the device's. Nil if none appeared.
         var newCursor: String?
+        /// Covers rows in a DELTA payload passed the server's since-cursor filter — each is a
+        /// changed cover the art cache must drop. Empty on full sync BY CONSTRUCTION: a full
+        /// payload ships the entire Covers table and would wipe the whole ~112MB cache.
+        var changedCoverIDs: [Int64] = []
     }
 
     /// The decoded backup tables. Internal so merge logic is unit-testable without zips.
@@ -69,7 +73,8 @@ enum BackupImporter {
         return MergeResult(snapshot: snapshot,
                            rawTunes: merged.tunes,
                            rawAudio: merged.audio,
-                           newCursor: merged.cursor)
+                           newCursor: merged.cursor,
+                           changedCoverIDs: mode == .delta ? tables.covers.compactMap(\.CoverID) : [])
     }
 
     // MARK: - Decode

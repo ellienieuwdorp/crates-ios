@@ -474,17 +474,17 @@ final class PlaybackController {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
-    /// Fetch the cover for the system player. Covers come from the unauthenticated
-    /// `/covers/byCoverID/{id}` endpoint; no cover, demo mode, or fetch failure just leaves the
-    /// system player artless — never blocks playback.
+    /// Fetch the cover for the system player through the shared ArtworkStore — instant when
+    /// cached (the user just tapped the row showing it) and offline-capable. Failure just
+    /// leaves the system player artless — never blocks playback.
     private func loadArtwork(for tune: Tune) {
         artworkTask?.cancel()
+        defer { prefetchUpcomingArtwork() }
         guard let coverID = tune.coverID else { return }
         if currentArtwork?.coverID == coverID { return } // same cover (e.g. same album), keep it
-        guard let url = connection?.coverURL(coverID: coverID) else { return }
         artworkTask = Task { [weak self] in
-            guard let (data, _) = try? await URLSession.shared.data(from: url),
-                  let image = UIImage(data: data), !Task.isCancelled else { return }
+            guard let image = await ArtworkStore.shared.image(coverID: coverID, variant: .display),
+                  !Task.isCancelled else { return }
             // The request handler must NOT be MainActor-isolated (the implicit default inside
             // this class): MediaPlayer calls it on its own accessQueue when the lock screen
             // renders, and the runtime isolation check traps — EXC_BREAKPOINT on every real
@@ -496,6 +496,14 @@ final class PlaybackController {
             self.currentArtwork = (coverID, artwork)
             self.updateNowPlaying()
         }
+    }
+
+    /// Warm the next few queue covers so track changes and the lock screen render instantly.
+    private func prefetchUpcomingArtwork() {
+        guard let i = currentIndex else { return }
+        let upcoming = entries.dropFirst(i + 1).prefix(3).compactMap(\.tune.coverID)
+        guard !upcoming.isEmpty else { return }
+        ArtworkStore.shared.prefetch(coverIDs: Array(upcoming), variant: .display)
     }
 
     private func updateNowPlayingTime() {

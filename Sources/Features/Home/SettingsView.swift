@@ -17,6 +17,8 @@ struct SettingsView: View {
                 if model.isPaired {
                     LabeledContent("Connected to", value: model.connection.host)
                     Button("Re-sync Library") { Task { try? await model.runInitialSync() } }
+                    // ~112MB for the full corpus; makes every cover render offline.
+                    Button("Cache All Artwork") { model.warmAllArtwork() }
                     Button("Sign Out", role: .destructive) { model.signOut(); dismiss() }
                 } else {
                     TextField("Server IP (e.g. 192.168.1.42)", text: $host)
