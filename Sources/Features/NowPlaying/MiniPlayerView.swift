@@ -9,6 +9,18 @@ struct MiniPlayerView: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            if player.current == nil {
+                // Idle state: the accessory stays attached so the tab view's identity never
+                // changes when playback starts (see RootView).
+                Image(systemName: "music.note")
+                    .font(.body)
+                    .foregroundStyle(CratesColor.textSecondary)
+                    .frame(width: CratesMetrics.miniPlayerArt, height: CratesMetrics.miniPlayerArt)
+                Text("Not Playing")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(CratesColor.textSecondary)
+                Spacer(minLength: 4)
+            }
             if let tune = player.current {
                 Artwork(tune: tune, size: CratesMetrics.miniPlayerArt)
                 VStack(alignment: .leading, spacing: 1) {

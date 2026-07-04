@@ -39,6 +39,11 @@ final class SmokeTests: XCTestCase {
         let matches = app.staticTexts.matching(identifier: "Solar Wind")
         XCTAssertTrue(matches.firstMatch.waitForExistence(timeout: 5))
 
+        // Regression (device crash, 2026-07-04): starting playback must NOT rebuild the tab
+        // view — we must still be inside the crate, not popped back to the Browse root.
+        XCTAssertTrue(app.navigationBars["Peak Time / Driving"].exists,
+                      "starting playback popped the navigation stack")
+
         // Expand to the full player via the mini player (the accessory is the last match).
         let accessory = matches.element(boundBy: max(0, matches.count - 1))
         accessory.tap()

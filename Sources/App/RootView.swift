@@ -10,21 +10,21 @@ struct RootView: View {
     @State private var selection: AppTab = .home
 
     var body: some View {
-        // The accessory must be attached conditionally: an empty @ViewBuilder result still
-        // renders a blank glass capsule above the tab bar.
-        Group {
-            if player.hasContent {
-                tabs.tabViewBottomAccessory {
-                    MiniPlayerView { showNowPlaying = true }
-                }
-            } else {
-                tabs
+        // The accessory is attached unconditionally: swapping between `tabs` and
+        // `tabs.tabViewBottomAccessory{}` when playback starts changes the view's structural
+        // identity, which rebuilds the whole TabView — every NavigationStack pops to root and
+        // the teardown mid-tap crashes (seen on device, 2026-07-04). The mini player renders a
+        // "Not Playing" state instead (Apple Music does the same), which also avoids the
+        // blank-capsule artifact that conditional attachment was originally working around.
+        // No tabBarMinimizeBehavior: the minimized bar's floating pill stops insetting the
+        // scroll content, so list bottoms hide underneath it.
+        tabs
+            .tabViewBottomAccessory {
+                MiniPlayerView { if player.hasContent { showNowPlaying = true } }
             }
-        }
-        .tabBarMinimizeBehavior(.onScrollDown)
-        .sheet(isPresented: $showNowPlaying) {
-            NowPlayingView()
-        }
+            .sheet(isPresented: $showNowPlaying) {
+                NowPlayingView()
+            }
     }
 
     private var tabs: some View {
