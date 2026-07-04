@@ -30,16 +30,31 @@ struct RootView: View {
     private var tabs: some View {
         TabView(selection: $selection) {
             Tab("Home", systemImage: "house.fill", value: AppTab.home) {
-                HomeView()
+                HomeView().miniPlayerClearance()
             }
             Tab("Browse", systemImage: "square.stack.3d.up.fill", value: AppTab.browse) {
-                BrowseView()
+                BrowseView().miniPlayerClearance()
             }
             Tab(value: AppTab.search, role: .search) {
-                SearchView()
+                SearchView().miniPlayerClearance()
             }
         }
     }
 }
 
 enum AppTab: Hashable { case home, browse, search }
+
+extension View {
+    /// iOS 27 (beta, on Ellie's phone) stopped propagating the tabViewBottomAccessory height
+    /// into the bottom safe area, so scroll content hides under the mini player pill — iOS 26
+    /// insets correctly, which is why the simulator never showed the overlap. Explicit bottom
+    /// clearance for every scrollable in the tab, gated to 27+ so 26 doesn't double-inset.
+    /// Applied per-tab (not on the TabView) so presented sheets don't inherit the margin.
+    @ViewBuilder func miniPlayerClearance() -> some View {
+        if #available(iOS 27, *) {
+            contentMargins(.bottom, 72, for: .scrollContent)
+        } else {
+            self
+        }
+    }
+}
