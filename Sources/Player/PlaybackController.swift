@@ -41,7 +41,17 @@ final class PlaybackController {
     /// instead of a fake playing state (Philosophy #7).
     private(set) var playbackError: String? = nil
     var repeatMode: RepeatMode = .off
-    var isShuffled = false
+    /// Toggle only via toggleShuffle() — the flag must never flip without the reorder side
+    /// effect (it was a dead flag once; see docs/design/dogfood-round-3.md W1).
+    private(set) var isShuffled = false
+    /// Original relative order (entry IDs) of the context tracks, snapshotted when shuffle
+    /// turns on. Un-shuffling sorts the surviving upcoming context entries back into this order.
+    @ObservationIgnored private var preShuffleOrder: [UUID] = []
+    /// Test seam: inject a seeded generator for deterministic shuffle assertions.
+    @ObservationIgnored var shuffleRNG: any RandomNumberGenerator = SystemRandomNumberGenerator()
+    /// Lap guard for auto-skipping unplayable tracks: an entirely dead queue must stop with an
+    /// honest error after one pass, not loop failures forever.
+    private var consecutiveFailures = 0
     /// Where the context part of the queue came from (crate name, "Search"…) — shown as the
     /// Up Next section label.
     private(set) var contextName: String? = nil
@@ -58,6 +68,7 @@ final class PlaybackController {
     private var player: AVPlayer?
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
+    private var failedObserver: NSObjectProtocol?
     private var statusObservation: NSKeyValueObservation?
     private var interruptionObserver: NSObjectProtocol?
     private var audioSessionActivated = false
@@ -124,12 +135,20 @@ final class PlaybackController {
         guard !tunes.isEmpty, tunes.indices.contains(index) else { stop(); return }
         entries = tunes.map { QueueEntry($0, origin: .context) }
         contextName = context
+        consecutiveFailures = 0
         startPlayback(at: index)
+        if isShuffled {
+            // Shuffle survives a context change (platform convention): the tapped track
+            // starts, the rest of the new context shuffles behind it.
+            preShuffleOrder = entries.map(\.id) // all .context by construction
+            shuffleUpcomingContext()
+        }
     }
 
     /// Tap-to-jump in the queue sheet.
     func jump(to index: Int) {
         guard entries.indices.contains(index) else { return }
+        consecutiveFailures = 0 // user-initiated: give the lap guard a fresh lap
         startPlayback(at: index)
     }
 
@@ -167,6 +186,51 @@ final class PlaybackController {
         if let cid = currentID {
             currentIndex = entries.firstIndex(where: { $0.id == cid })
         }
+    }
+
+    // MARK: - Shuffle
+    //
+    // Shuffles only the upcoming *context* entries: manual play-next/queued rows keep their
+    // exact slots, so the Up Next origin invariant — and the origin-scanning inserts in
+    // playNext/addToEndOfQueue — keep working unchanged while shuffled. (Do not "fix" this to
+    // shuffle the whole upcoming region: interleaved origins silently break both inserts.)
+
+    func toggleShuffle() {
+        if isShuffled {
+            isShuffled = false
+            restoreUpcomingContextOrder()
+            preShuffleOrder = []
+        } else {
+            isShuffled = true
+            preShuffleOrder = entries.filter { $0.origin == .context }.map(\.id)
+            shuffleUpcomingContext()
+        }
+    }
+
+    /// Indices after the current track holding auto-added context entries — the only slots
+    /// shuffle may permute.
+    private var upcomingContextSlots: [Int] {
+        let start = (currentIndex ?? -1) + 1
+        return entries.indices.filter { $0 >= start && entries[$0].origin == .context }
+    }
+
+    private func shuffleUpcomingContext() {
+        let slots = upcomingContextSlots
+        guard slots.count > 1 else { return }
+        var pool = slots.map { entries[$0] }
+        var rng = shuffleRNG
+        pool.shuffle(using: &rng)
+        shuffleRNG = rng
+        for (slot, entry) in zip(slots, pool) { entries[slot] = entry }
+    }
+
+    private func restoreUpcomingContextOrder() {
+        let slots = upcomingContextSlots
+        guard slots.count > 1 else { return }
+        let rank = Dictionary(uniqueKeysWithValues: preShuffleOrder.enumerated().map { ($1, $0) })
+        let restored = slots.map { entries[$0] }
+            .sorted { (rank[$0.id] ?? .max) < (rank[$1.id] ?? .max) } // stable: strangers keep current order
+        for (slot, entry) in zip(slots, restored) { entries[slot] = entry }
     }
 
     // MARK: - Transport
@@ -245,13 +309,12 @@ final class PlaybackController {
         duration = tune.lengthSeconds ?? 0
 
         guard let url = resolvePlaybackURL(for: tune) else {
-            // No local file and no configured server: show the track as current but be honest
-            // that it can't play right now — never a fake spinning "playing" state.
+            // No local file and no configured server: same stranding shape as a failed
+            // stream, so it takes the same auto-skip path (recursion is bounded by the
+            // lap guard — an entirely offline queue stops after one pass, honestly).
             removeObservers()
             player?.replaceCurrentItem(with: nil)
-            isPlaying = false
-            playbackError = "Not available — no server connection and not downloaded."
-            updateNowPlaying()
+            handlePlaybackFailure("Not available — no server connection and not downloaded.")
             return
         }
 
@@ -300,23 +363,48 @@ final class PlaybackController {
         ) { [weak self] _ in
             Task { @MainActor in self?.trackDidEnd() }
         }
-        // Surface stream failures (bad token, server down, unsupported codec) instead of
-        // spinning silently with isPlaying == true.
+        // A dying stream mid-track posts FailedToPlayToEndTime while item.status can stay
+        // .readyToPlay — without this observer the app froze in a fake playing state and
+        // repeat/advance silently died (dogfood round 3, W1).
+        failedObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main
+        ) { [weak self] note in
+            let message = (note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError)?
+                .localizedDescription ?? "The stream stopped unexpectedly."
+            Task { @MainActor in self?.handlePlaybackFailure(message) }
+        }
+        // Surface load failures (bad token, server refusal, unsupported codec) AND move on:
+        // a failed item never posts DidPlayToEndTime, so without advancing here one dead
+        // track strands the entire queue.
         statusObservation = item.observe(\.status) { [weak self] item, _ in
-            guard item.status == .failed else { return }
-            let message = item.error?.localizedDescription ?? "The stream failed to load."
-            Task { @MainActor in
-                guard let self else { return }
-                self.isPlaying = false
-                self.playbackError = message
-                self.updateNowPlaying()
+            switch item.status {
+            case .readyToPlay:
+                Task { @MainActor in self?.consecutiveFailures = 0 } // a track that loads resets the lap guard
+            case .failed:
+                let message = item.error?.localizedDescription ?? "The stream failed to load."
+                Task { @MainActor in self?.handlePlaybackFailure(message) }
+            default:
+                break
             }
         }
+    }
+
+    /// Common exit for every way a track can die (load failure, mid-stream death, no URL):
+    /// surface the honest error, then auto-skip — unless we've already failed our way around
+    /// the whole queue, in which case stop advancing and leave the error visible.
+    func handlePlaybackFailure(_ message: String) {
+        isPlaying = false
+        playbackError = message
+        updateNowPlaying()
+        consecutiveFailures += 1
+        guard consecutiveFailures < max(entries.count, 1) else { return } // full dead lap — stop honestly
+        advance(honorRepeatOne: false) // never honorRepeatOne: repeat-one would re-seek the dead item forever
     }
 
     private func removeObservers() {
         if let t = timeObserver { player?.removeTimeObserver(t); timeObserver = nil }
         if let e = endObserver { NotificationCenter.default.removeObserver(e); endObserver = nil }
+        if let f = failedObserver { NotificationCenter.default.removeObserver(f); failedObserver = nil }
         statusObservation?.invalidate(); statusObservation = nil
     }
 

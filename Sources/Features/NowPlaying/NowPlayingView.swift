@@ -226,7 +226,7 @@ struct NowPlayingView: View {
     /// morph doesn't re-scale the controls.
     private var transport: some View {
         HStack(spacing: 0) {
-            Button { player.isShuffled.toggle() } label: {
+            Button { player.toggleShuffle() } label: {
                 Image(systemName: "shuffle").font(.title3.weight(.semibold))
                     .foregroundStyle(player.isShuffled ? CratesColor.accent : .primary)
             }
@@ -263,12 +263,8 @@ struct NowPlayingView: View {
             Image(systemName: "chevron.compact.up")
                 .font(.body.weight(.semibold))
                 .rotationEffect(.degrees(queueExpanded ? 180 : 0))
-            Text("Up Next").font(.subheadline.weight(.semibold))
-            if !upNextEntries.isEmpty {
-                Text("\(upNextEntries.count)")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(CratesColor.textSecondary)
-            }
+            // No count: "Queue · 2000" after playing a big crate is noise, not information.
+            Text("Queue").font(.subheadline.weight(.semibold))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
@@ -278,9 +274,7 @@ struct NowPlayingView: View {
         .onTapGesture { setQueue(expanded: !queueExpanded) }
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(queueExpanded
-            ? "Collapse queue"
-            : "Expand queue, \(upNextEntries.count) tracks up next")
+        .accessibilityLabel(queueExpanded ? "Collapse queue" : "Expand queue")
         .accessibilityIdentifier("queueHandle")
         .accessibilityAdjustableAction { direction in
             setQueue(expanded: direction == .increment)

@@ -2,6 +2,18 @@ import Testing
 import Foundation
 @testable import CratesIOS
 
+/// Deterministic RNG (SplitMix64) so shuffle tests assert exact behavior, not probabilities.
+private struct SeededRNG: RandomNumberGenerator {
+    var state: UInt64
+    mutating func next() -> UInt64 {
+        state &+= 0x9E3779B97F4A7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+        return z ^ (z >> 31)
+    }
+}
+
 /// Queue index math in PlaybackController — the swipe-to-queue features (Ideas #5/#6) live or die
 /// on these invariants. Runs on MainActor since the controller is UI-bound.
 @MainActor
@@ -183,6 +195,111 @@ struct QueueLogicTests {
         #expect(p.currentIndex == 3)
         p.jump(to: 99) // no-op
         #expect(p.currentIndex == 3)
+    }
+
+    // MARK: - Shuffle (deterministic via seeded RNG)
+
+    @Test func shuffleKeepsCurrentAndShufflesOnlyUpcoming() {
+        let p = makeController()
+        p.shuffleRNG = SeededRNG(state: 1)
+        p.play(makeTunes(10), startingAt: 2)
+        let before = p.queue.map(\.id)
+        p.toggleShuffle()
+        #expect(p.isShuffled)
+        #expect(p.currentIndex == 2)
+        #expect(p.current?.id == 3)
+        #expect(Array(p.queue.map(\.id).prefix(3)) == Array(before.prefix(3))) // played + current untouched
+        #expect(Set(p.queue.map(\.id)) == Set(before)) // same tracks, none lost or duplicated
+        #expect(p.queue.map(\.id) != before) // seeded RNG: order actually changed
+    }
+
+    @Test func unshuffleRestoresOriginalUpcomingOrder() {
+        let p = makeController()
+        p.shuffleRNG = SeededRNG(state: 7)
+        p.play(makeTunes(8), startingAt: 1)
+        let before = p.queue.map(\.id)
+        p.toggleShuffle()
+        p.toggleShuffle()
+        #expect(!p.isShuffled)
+        #expect(p.queue.map(\.id) == before)
+    }
+
+    @Test func unshuffleAfterAdvancingRestoresRemainingRelativeOrder() {
+        let p = makeController()
+        p.shuffleRNG = SeededRNG(state: 3)
+        p.play(makeTunes(8), startingAt: 0)
+        let original = p.queue.map(\.id)
+        p.toggleShuffle()
+        p.next(); p.next() // advance into the shuffled region
+        let playedPrefix = Array(p.queue.map(\.id).prefix((p.currentIndex ?? 0) + 1))
+        p.toggleShuffle()
+        // Played/current tracks stay where they landed; the remainder returns to original
+        // relative order.
+        #expect(Array(p.queue.map(\.id).prefix(playedPrefix.count)) == playedPrefix)
+        let remaining = Array(p.queue.map(\.id).dropFirst(playedPrefix.count))
+        let expected = original.filter { remaining.contains($0) }
+        #expect(remaining == expected)
+    }
+
+    @Test func manualAddsLandCorrectlyWhileShuffled() {
+        let p = makeController()
+        p.shuffleRNG = SeededRNG(state: 5)
+        p.play(makeTunes(6), startingAt: 0)
+        p.toggleShuffle()
+        p.playNext(Tune(id: 90, title: "n", artist: "a"))
+        p.addToEndOfQueue(Tune(id: 91, title: "q", artist: "a"))
+        // Origin invariant survives shuffling: play-next block, queued block, then context.
+        #expect(p.entries[1].origin == .playNext && p.entries[1].tune.id == 90)
+        #expect(p.entries[2].origin == .queued && p.entries[2].tune.id == 91)
+        p.toggleShuffle()
+        // Manual rows keep their slots through un-shuffle.
+        #expect(p.entries[1].tune.id == 90)
+        #expect(p.entries[2].tune.id == 91)
+    }
+
+    @Test func playWhileShuffledStartsTappedTrackAndKeepsFlag() {
+        let p = makeController()
+        p.shuffleRNG = SeededRNG(state: 9)
+        p.play(makeTunes(5), startingAt: 0)
+        p.toggleShuffle()
+        p.play(makeTunes(7), startingAt: 4) // new context while shuffled
+        #expect(p.isShuffled)
+        #expect(p.current?.id == 5) // the tapped track always plays
+        #expect(Set(p.queue.map(\.id)) == Set((1...7).map(Int64.init)))
+    }
+
+    // MARK: - Failure auto-advance (the device repeat-all bug)
+
+    @Test func failureAutoAdvancesToNextTrack() {
+        let p = makeController()
+        p.play(makeTunes(3), startingAt: 0)
+        p.handlePlaybackFailure("dead")
+        #expect(p.currentIndex == 1) // skipped past the dead track
+    }
+
+    @Test func allDeadQueueStopsAfterOneLapInsteadOfLooping() {
+        let p = makeController()
+        p.play(makeTunes(3), startingAt: 0)
+        p.repeatMode = .all
+        p.handlePlaybackFailure("dead")
+        p.handlePlaybackFailure("dead")
+        p.handlePlaybackFailure("dead") // third consecutive failure = full lap
+        let stuck = p.currentIndex
+        p.handlePlaybackFailure("dead")
+        #expect(p.currentIndex == stuck) // lap guard: no further advancing
+        #expect(p.playbackError != nil)
+        #expect(!p.isPlaying)
+    }
+
+    @Test func userJumpResetsTheFailureLapGuard() {
+        let p = makeController()
+        p.play(makeTunes(3), startingAt: 0)
+        p.handlePlaybackFailure("dead")
+        p.handlePlaybackFailure("dead")
+        p.handlePlaybackFailure("dead")
+        p.jump(to: 0) // user acts — fresh lap
+        p.handlePlaybackFailure("dead")
+        #expect(p.currentIndex == 1) // advancing works again
     }
 
     @Test func stopClearsEverythingWithoutCrashing() {

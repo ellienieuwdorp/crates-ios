@@ -9,6 +9,7 @@ struct SettingsView: View {
 
     @State private var host: String = ""
     @State private var port: String = String(CratesConnection.defaultPort)
+    @AppStorage("appearance") private var appearance: AppAppearance = .system
 
     var body: some View {
         Form {
@@ -26,6 +27,15 @@ struct SettingsView: View {
                     TextField("Port", text: $port).keyboardType(.numberPad)
                     pairRow
                 }
+            }
+
+            Section("Appearance") {
+                Picker("Theme", selection: $appearance) {
+                    ForEach(AppAppearance.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
 
             Section {
