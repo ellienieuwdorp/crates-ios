@@ -16,6 +16,7 @@ struct HomeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         header
+                        recentsRow
                         hotlinks
                     }
                     .padding(.horizontal, CratesMetrics.gutter)
@@ -33,8 +34,17 @@ struct HomeView: View {
                     NavigationLink { SettingsView() } label: { Image(systemName: "gearshape") }
                 }
             }
-            .refreshable { await library.refreshRoot()?.value }
-            .onAppear { library.refreshRoot() }
+            .refreshable {
+                if model.isPaired { await model.runDeltaSync(force: true) }
+                else { await library.refreshRoot()?.value }
+            }
+            .onAppear {
+                library.refreshRoot()
+                model.pins.seedIfNeeded(with: library.rootCrates)
+            }
+            .onChange(of: library.rootCrates) { _, roots in
+                model.pins.seedIfNeeded(with: roots) // first sync may land after onAppear
+            }
         }
     }
 
@@ -62,16 +72,48 @@ struct HomeView: View {
         }
     }
 
-    /// Six configurable hotlinks. In the POC these are the top crates + fixed entries; a real
-    /// build lets the user pin any crate/search/playlist here.
+    /// Auto recents: most-recently opened/played crates (local usage log), excluding pins —
+    /// the chips are the adaptive zone, the grid below stays stable muscle memory.
+    @ViewBuilder private var recentsRow: some View {
+        let recents = model.usage.recentCrateIDs()
+            .filter { !model.pins.isPinned($0) }
+            .compactMap { library.crate(byID: $0) }
+        if !recents.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(recents) { crate in
+                        NavigationLink { CrateDetailView(crate: crate) } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock.arrow.circlepath").font(.caption2)
+                                Text(crate.name).font(.subheadline.weight(.medium)).lineLimit(1)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(CratesColor.surface, in: .capsule)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    /// The pinned grid: user-owned, stable positions (pin/unpin via context menus; new pins
+    /// append nearest the thumb). Seeded once with the top roots so it's never empty.
     private var hotlinks: some View {
-        let pinned = Array(library.rootCrates.prefix(6))
+        let pinned = model.pins.ids.compactMap { library.crate(byID: $0) }
         return LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
             ForEach(pinned) { crate in
                 NavigationLink { CrateDetailView(crate: crate) } label: {
                     HotlinkTile(crate: crate)
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button(role: .destructive) { model.pins.unpin(crate.id) } label: {
+                        Label("Unpin from Home", systemImage: "pin.slash")
+                    }
+                }
             }
         }
     }

@@ -84,6 +84,84 @@ final class LibraryStore {
         s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).lowercased()
     }
 
+    // MARK: - Crate finder (the tree's problem is depth, not breadth — jump straight to a crate)
+
+    struct CrateIndexEntry: Codable, Sendable, Identifiable {
+        var crate: Crate
+        /// Ancestor breadcrumb, e.g. "Collection › Techno" — empty for roots.
+        var path: String
+        var id: Int64 { crate.id }
+    }
+
+    private(set) var crateByID: [Int64: Crate] = [:]
+    private(set) var crateIndex: [CrateIndexEntry] = []
+    private var crateKeys: [String] = []
+
+    func crate(byID id: Int64) -> Crate? { crateByID[id] }
+
+    private func setCrateIndex(_ entries: [CrateIndexEntry]) {
+        crateIndex = entries
+        crateByID = Dictionary(entries.map { ($0.crate.id, $0.crate) }, uniquingKeysWith: { a, _ in a })
+        crateKeys = entries.map { Self.fold("\($0.crate.name) \($0.path)") }
+    }
+
+    /// Token-AND crate search over name+path, name-prefix ranked first. Cap 50.
+    func searchCrates(_ query: String) -> [CrateIndexEntry] {
+        let tokens = Self.fold(query).split(separator: " ").map(String.init)
+        guard !tokens.isEmpty else { return [] }
+        var scored: [(score: Int, index: Int)] = []
+        for (i, key) in crateKeys.enumerated() {
+            guard tokens.allSatisfy({ key.contains($0) }) else { continue }
+            let nameKey = Self.fold(crateIndex[i].crate.name)
+            scored.append((nameKey.hasPrefix(tokens[0]) ? 1 : 0, i))
+        }
+        return scored
+            .sorted { $0.score != $1.score ? $0.score > $1.score : $0.index < $1.index }
+            .prefix(50)
+            .map { crateIndex[$0.index] }
+    }
+
+    /// Flatten the tree into breadcrumbed entries (BFS from roots; orphans get an empty path).
+    private static func buildCrateIndex(roots: [Crate],
+                                        children: [Int64: [Crate]],
+                                        all: [Int64: Crate]) -> [CrateIndexEntry] {
+        var entries: [CrateIndexEntry] = []
+        var visited = Set<Int64>()
+        var queue: [(Crate, String)] = roots.map { ($0, "") }
+        while !queue.isEmpty {
+            let (crate, path) = queue.removeFirst()
+            guard visited.insert(crate.id).inserted else { continue }
+            entries.append(CrateIndexEntry(crate: crate, path: path))
+            let childPath = path.isEmpty ? crate.name : "\(path) › \(crate.name)"
+            for child in children[crate.id] ?? [] { queue.append((child, childPath)) }
+        }
+        for (id, crate) in all where !visited.contains(id) {
+            entries.append(CrateIndexEntry(crate: crate, path: ""))
+        }
+        return entries
+    }
+
+    /// Every tune in this crate AND its subtree, deduped by id, crate-order preserved per level.
+    /// Async: unhydrated crates load from disk on the way down (cold start).
+    func deepTunes(of crateID: Int64) async -> [Tune] {
+        var result: [Tune] = []
+        var seenTunes = Set<Int64>()
+        var visited = Set<Int64>()
+        var queue = [crateID]
+        while !queue.isEmpty {
+            let id = queue.removeFirst()
+            guard visited.insert(id).inserted else { continue }
+            var ts = tunesByCrate[id]
+            if ts == nil, let cached: [Tune] = await DiskCache.shared.load("tunes_\(id)", as: [Tune].self) {
+                tunesByCrate[id] = cached
+                ts = cached
+            }
+            for t in ts ?? [] where seenTunes.insert(t.id).inserted { result.append(t) }
+            queue.append(contentsOf: (childrenByCrate[id] ?? []).map(\.id))
+        }
+        return result
+    }
+
     /// Inject representative data for demo mode (no server). Marks everything `.live` so the UI
     /// looks settled rather than perpetually "updating".
     func loadDemoData(_ crates: [Crate], tunesByCrate: [Int64: [Tune]]) {
@@ -97,6 +175,8 @@ final class LibraryStore {
         // Demo search corpus: dedupe the per-crate lists by id.
         var seen = Set<Int64>()
         setAllTunes(tunesByCrate.values.flatMap { $0 }.filter { seen.insert($0.id).inserted })
+        setCrateIndex(Self.buildCrateIndex(roots: crates, children: childrenByCrate,
+                                           all: Dictionary(crates.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })))
     }
 
     /// Populate the whole library from a synced backup snapshot (the real onboarding path) and
@@ -112,15 +192,20 @@ final class LibraryStore {
         for id in snapshot.tunesByCrate.keys { crateState[id] = .live }
 
         setAllTunes(snapshot.allTunes)
+        setCrateIndex(Self.buildCrateIndex(roots: snapshot.rootCrates,
+                                           children: snapshot.childrenByCrate,
+                                           all: snapshot.allCratesByID))
 
         // Persist snapshot pieces so the next launch renders from disk before any network call.
         let roots = snapshot.rootCrates, recents = recentCrates
         let children = snapshot.childrenByCrate, tunes = snapshot.tunesByCrate
-        let all = snapshot.allTunes
+        let all = snapshot.allTunes, index = crateIndex
         Task.detached {
             await DiskCache.shared.save(roots, key: "root_crates")
             await DiskCache.shared.save(recents, key: "recent_crates")
             await DiskCache.shared.save(all, key: "all_tunes")
+            await DiskCache.shared.save(index, key: "crate_index")
+            await DiskCache.shared.save(children, key: "children_map")
             for (id, kids) in children { await DiskCache.shared.save(kids, key: "children_\(id)") }
             for (id, ts) in tunes { await DiskCache.shared.save(ts, key: "tunes_\(id)") }
         }
@@ -136,6 +221,12 @@ final class LibraryStore {
         }
         if let all: [Tune] = await DiskCache.shared.load("all_tunes", as: [Tune].self) {
             setAllTunes(all)
+        }
+        if let index: [CrateIndexEntry] = await DiskCache.shared.load("crate_index", as: [CrateIndexEntry].self) {
+            setCrateIndex(index)
+        }
+        if let children: [Int64: [Crate]] = await DiskCache.shared.load("children_map", as: [Int64: [Crate]].self) {
+            childrenByCrate = children
         }
     }
 

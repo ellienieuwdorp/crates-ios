@@ -12,6 +12,8 @@ final class AppModel {
     let library = LibraryStore()
     let player = PlaybackController()
     let downloads = DownloadManager()
+    let usage = UsageLog()
+    let pins = HomePins()
 
     var isPaired: Bool { connection.isConfigured }
     /// Demo mode lets the POC render a realistic library with no server (simulator, screenshots).
@@ -67,6 +69,8 @@ final class AppModel {
             return
         }
         await library.hydrateFromDisk()
+        await usage.hydrate()
+        pins.configure(demo: false)
         if isPaired {
             // Paired ⇒ the library is backup-synced; disk cache is the source of truth.
             library.markSnapshotBacked()
@@ -207,6 +211,7 @@ final class AppModel {
     func enterDemoMode() {
         isDemo = true
         library.loadDemoData(SampleData.crates, tunesByCrate: SampleData.tunesByCrate)
+        pins.configure(demo: true)
     }
 
     // MARK: - Persistence (token → Keychain in a real build)
