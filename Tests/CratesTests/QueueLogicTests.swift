@@ -35,11 +35,12 @@ struct QueueLogicTests {
         #expect(p.current?.id == t.id)
     }
 
-    @Test func addToEndAppendsWithoutMovingCurrent() {
+    @Test func addToQueueJumpsAheadOfRemainingContext() {
         let p = makeController()
         p.play(makeTunes(3), startingAt: 0)
         p.addToEndOfQueue(Tune(id: 99, title: "x", artist: "a"))
-        #expect(p.queue.last?.id == 99)
+        // Manual additions play before the rest of the auto-added context.
+        #expect(p.queue.map(\.id) == [1, 99, 2, 3])
         #expect(p.currentIndex == 0)
     }
 
@@ -49,6 +50,27 @@ struct QueueLogicTests {
         p.playNext(Tune(id: 99, title: "x", artist: "a"))
         #expect(p.queue.map(\.id) == [1, 2, 99, 3, 4])
         #expect(p.current?.id == 2)
+    }
+
+    /// The Up Next ordering invariant: play-next block (FIFO), then queued block (FIFO), then
+    /// the remaining context tracks.
+    @Test func manualBlocksKeepFIFOOrderAheadOfContext() {
+        let p = makeController()
+        p.play(makeTunes(4), startingAt: 0) // context: [1][2,3,4]
+        p.addToEndOfQueue(Tune(id: 90, title: "q1", artist: "a"))
+        p.playNext(Tune(id: 91, title: "n1", artist: "a"))
+        p.playNext(Tune(id: 92, title: "n2", artist: "a"))
+        p.addToEndOfQueue(Tune(id: 93, title: "q2", artist: "a"))
+        #expect(p.queue.map(\.id) == [1, 91, 92, 90, 93, 2, 3, 4])
+        #expect(p.entries[1].origin == .playNext)
+        #expect(p.entries[3].origin == .queued)
+        #expect(p.entries[5].origin == .context)
+    }
+
+    @Test func playRecordsContextName() {
+        let p = makeController()
+        p.play(makeTunes(2), startingAt: 0, context: "Peak Time")
+        #expect(p.contextName == "Peak Time")
     }
 
     @Test func removeBeforeCurrentShiftsIndex() {

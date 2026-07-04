@@ -44,15 +44,19 @@ final class SmokeTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Peak Time / Driving"].exists,
                       "starting playback popped the navigation stack")
 
-        // Expand to the full player via the mini player (the accessory is the last match).
-        let accessory = matches.element(boundBy: max(0, matches.count - 1))
-        accessory.tap()
-        // Full player embeds the Up Next queue behind a handle; tapping it opens the full sheet.
-        let upNextHandle = app.staticTexts["Up Next"].firstMatch
-        if upNextHandle.waitForExistence(timeout: 3) {
-            upNextHandle.tap()
-            XCTAssertTrue(app.navigationBars["Queue"].waitForExistence(timeout: 3))
-        }
+        // Expand to the full player via the mini player accessory (stable identifier — matching
+        // the title text is ambiguous with the row and flaky on device).
+        let mini = app.descendants(matching: .any)["miniPlayer"].firstMatch
+        XCTAssertTrue(mini.waitForExistence(timeout: 5))
+        mini.tap()
+
+        // Full player hides the queue behind the Up Next handle; tapping expands it in place —
+        // the next context track from the crate must appear (no sheet, no navigation).
+        let handle = app.descendants(matching: .any)["queueHandle"].firstMatch
+        XCTAssertTrue(handle.waitForExistence(timeout: 5), "full player did not open")
+        handle.tap()
+        XCTAssertTrue(app.staticTexts["Nightdrive (Original Mix)"].waitForExistence(timeout: 3),
+                      "queue did not expand in place")
     }
 
     @MainActor

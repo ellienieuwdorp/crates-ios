@@ -70,7 +70,7 @@ struct CrateDetailView: View {
                         isCurrent: player.current?.id == tune.id,
                         isDownloaded: downloads.isDownloaded(tune.id)
                     ) {
-                        player.play(tunes, startingAt: index)
+                        player.play(tunes, startingAt: index, context: crate.name)
                     }
                 }
             }
@@ -85,7 +85,7 @@ struct CrateDetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button { player.play(tunes, startingAt: 0) } label: { Label("Play All", systemImage: "play.fill") }
+                    Button { player.play(tunes, startingAt: 0, context: crate.name) } label: { Label("Play All", systemImage: "play.fill") }
                         .disabled(tunes.isEmpty)
                     Button { for t in tunes { player.addToEndOfQueue(t) } } label: { Label("Queue All", systemImage: "text.append") }
                         .disabled(tunes.isEmpty)

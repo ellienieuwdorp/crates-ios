@@ -6,12 +6,24 @@ import UIKit
 
 enum RepeatMode: Sendable { case off, all, one }
 
+/// How an entry got into the queue. Drives the Up Next split: manual additions (play-next, then
+/// queued) always precede the remaining auto-added context tracks.
+enum QueueOrigin: Sendable, Equatable {
+    /// Swipe-left "play next" — jumps the line, FIFO within its own block.
+    case playNext
+    /// Swipe-right "add to queue" — after all play-next items, FIFO within its own block.
+    case queued
+    /// Auto-added because a track was tapped inside a crate/search (the rest of that context).
+    case context
+}
+
 /// A queue slot with identity independent of the tune it holds — the same track queued twice must
 /// be two distinct, individually movable/removable rows.
 struct QueueEntry: Identifiable, Equatable, Sendable {
     let id: UUID
     var tune: Tune
-    init(_ tune: Tune) { self.id = UUID(); self.tune = tune }
+    var origin: QueueOrigin
+    init(_ tune: Tune, origin: QueueOrigin = .context) { self.id = UUID(); self.tune = tune; self.origin = origin }
 }
 
 /// The phone *is* the player (Philosophy #5): its own queue, streaming audio on-device, with full
@@ -30,6 +42,9 @@ final class PlaybackController {
     private(set) var playbackError: String? = nil
     var repeatMode: RepeatMode = .off
     var isShuffled = false
+    /// Where the context part of the queue came from (crate name, "Search"…) — shown as the
+    /// Up Next section label.
+    private(set) var contextName: String? = nil
 
     /// Tune-only view of the queue, for lists and tests.
     var queue: [Tune] { entries.map(\.tune) }
@@ -52,6 +67,9 @@ final class PlaybackController {
     /// `updateNowPlaying()` never attaches a stale image after a track change.
     private var currentArtwork: (coverID: Int64, artwork: MPMediaItemArtwork)?
     private var artworkTask: Task<Void, Never>?
+    /// Set while an AVPlayer seek is in flight; the periodic time observer stays quiet until it
+    /// lands so the scrubber doesn't snap back to pre-seek times.
+    private var pendingSeekTarget: Double?
 
     init() {
         // Category only — activation waits for the first actual play, so launching the app never
@@ -67,28 +85,45 @@ final class PlaybackController {
     }
 
     // MARK: - Queue actions (Idea #5: swipe to queue)
+    //
+    // Up Next ordering invariant: after the current track come the manual additions —
+    // play-next items (FIFO), then queued items (FIFO) — and only then the rest of the
+    // auto-added context. Manual additions always jump ahead of the remaining context.
 
-    /// Swipe-right gesture target: append to the end of the queue.
+    /// Swipe-right gesture target: add to the queue — plays after all manual additions,
+    /// before the remaining context tracks.
     func addToEndOfQueue(_ tune: Tune) {
-        entries.append(QueueEntry(tune))
-        if currentIndex == nil { startPlayback(at: entries.count - 1) }
+        let entry = QueueEntry(tune, origin: .queued)
+        guard let i = currentIndex else {
+            entries.append(entry)
+            startPlayback(at: entries.count - 1)
+            return
+        }
+        var pos = i + 1
+        while pos < entries.count, entries[pos].origin != .context { pos += 1 }
+        entries.insert(entry, at: pos)
     }
 
-    /// Swipe-left gesture target: insert to play immediately after the current track.
+    /// Swipe-left gesture target: play next — goes to the end of the play-next block (FIFO),
+    /// ahead of queued items and context.
     func playNext(_ tune: Tune) {
+        let entry = QueueEntry(tune, origin: .playNext)
         guard let i = currentIndex else {
-            entries.insert(QueueEntry(tune), at: 0)
+            entries.insert(entry, at: 0)
             startPlayback(at: 0)
             return
         }
-        entries.insert(QueueEntry(tune), at: i + 1)
+        var pos = i + 1
+        while pos < entries.count, entries[pos].origin == .playNext { pos += 1 }
+        entries.insert(entry, at: pos)
     }
 
     /// Replace the queue and start from a chosen index (e.g. tapping a track in a crate).
     /// An empty list or out-of-range index stops playback rather than stranding orphaned audio.
-    func play(_ tunes: [Tune], startingAt index: Int) {
+    func play(_ tunes: [Tune], startingAt index: Int, context: String? = nil) {
         guard !tunes.isEmpty, tunes.indices.contains(index) else { stop(); return }
-        entries = tunes.map(QueueEntry.init)
+        entries = tunes.map { QueueEntry($0, origin: .context) }
+        contextName = context
         startPlayback(at: index)
     }
 
@@ -154,6 +189,7 @@ final class PlaybackController {
         player = nil
         currentIndex = nil; isPlaying = false
         currentTime = 0; duration = 0; playbackError = nil
+        pendingSeekTarget = nil
         artworkTask?.cancel(); artworkTask = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
@@ -181,9 +217,20 @@ final class PlaybackController {
     }
 
     func seek(to seconds: Double) {
-        player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
         currentTime = seconds
         updateNowPlaying()
+        guard let player else { return }
+        // Mute the periodic observer until the seek lands, and seek with zero tolerance:
+        // the default keyframe tolerance can land whole seconds away, which reads as the
+        // scrubber thumb snapping around after release.
+        pendingSeekTarget = seconds
+        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600),
+                    toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+            Task { @MainActor in
+                guard let self, finished else { return } // superseded by a newer seek
+                self.pendingSeekTarget = nil
+            }
+        }
     }
 
     // MARK: - Engine
@@ -192,6 +239,7 @@ final class PlaybackController {
         guard entries.indices.contains(index) else { return }
         currentIndex = index
         playbackError = nil
+        pendingSeekTarget = nil
         let tune = entries[index].tune
         currentTime = 0
         duration = tune.lengthSeconds ?? 0
@@ -239,6 +287,7 @@ final class PlaybackController {
         let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] t in
             guard let self else { return }
+            guard self.pendingSeekTarget == nil else { return } // seek in flight — don't fight it
             self.currentTime = t.seconds
             if self.duration == 0 {
                 let d = item.duration.seconds

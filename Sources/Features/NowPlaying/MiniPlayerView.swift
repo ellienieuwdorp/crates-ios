@@ -55,5 +55,6 @@ struct MiniPlayerView: View {
         .padding(.horizontal, 8)
         .contentShape(.rect)
         .onTapGesture(perform: onExpand)
+        .accessibilityIdentifier("miniPlayer")
     }
 }

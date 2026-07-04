@@ -33,11 +33,21 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         shot("03-playing-miniplayer")
 
-        // Expand to full player.
-        let matches = app.staticTexts.matching(identifier: "Solar Wind")
-        matches.element(boundBy: max(0, matches.count - 1)).tap()
+        // Expand to full player via the accessory's stable identifier.
+        let mini = app.descendants(matching: .any)["miniPlayer"].firstMatch
+        XCTAssertTrue(mini.waitForExistence(timeout: 5))
+        mini.tap()
         sleep(1)
         shot("04-now-playing")
+
+        // Expand the in-place queue via the handle.
+        let handle = app.descendants(matching: .any)["queueHandle"].firstMatch
+        XCTAssertTrue(handle.waitForExistence(timeout: 5), "full player did not open")
+        handle.tap()
+        sleep(1)
+        shot("04b-queue-expanded")
+        handle.tap() // collapse again so the swipe-down dismiss below behaves the same
+        sleep(1)
 
         // Back to Home with the mini player up — the hotlink grid must sit above the accessory.
         app.swipeDown(velocity: .fast)

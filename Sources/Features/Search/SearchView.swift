@@ -26,7 +26,7 @@ struct SearchView: View {
                             TrackRow(tune: tune,
                                      isCurrent: player.current?.id == tune.id,
                                      isDownloaded: downloads.isDownloaded(tune.id)) {
-                                player.play(results, startingAt: index)
+                                player.play(results, startingAt: index, context: "Search")
                             }
                         }
                     }

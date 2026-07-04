@@ -1,52 +1,53 @@
 import SwiftUI
 
-/// Full-screen player (Idea #4 v1): big art, title/artist, scrubber, a single transport row
-/// (shuffle · back · play · forward · repeat), and an embedded Up Next queue behind a grab
-/// handle — drag or tap the handle to open the full queue sheet with reorder/edit. Waveform
-/// scrubber and click-through to artist/album are deliberately deferred (Idea #4 "later").
+/// Full-screen player (Idea #4 v2). Two in-place states, no popups:
+///
+///   • collapsed — big art, title/artist, scrubber, one transport row
+///     (shuffle · back · play · forward · repeat), and the Up Next handlebar resting at the
+///     bottom. The queue stays tucked away.
+///   • expanded — swipe up (or tap) the handlebar: the header morphs into a compact art+title
+///     row, and the queue unfolds below the transport, split into the manual additions
+///     ("Added to Queue") and the remaining auto context ("From <crate>").
+///
+/// Waveform scrubber and click-through to artist/album are deliberately deferred (Idea #4 "later").
 struct NowPlayingView: View {
     @Environment(PlaybackController.self) private var player
-    @Environment(\.dismiss) private var dismiss
-    @State private var showQueue = false
+    @State private var queueExpanded = false
+    @State private var editMode: EditMode = .inactive
     @State private var scrubValue: Double = 0
     @State private var isScrubbing = false
+    @Namespace private var artNamespace
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             grabber
             if let tune = player.current {
-                Artwork(tune: tune, size: 260)
-                    .shadow(color: .black.opacity(0.25), radius: 24, y: 12)
-
-                VStack(spacing: 6) {
-                    Text(tune.displayTitle).font(.title2.bold()).multilineTextAlignment(.center).lineLimit(2)
-                    HStack(spacing: 6) {
-                        SourceBadge(source: tune.source)
-                        Text(tune.displayArtist).font(.title3).foregroundStyle(CratesColor.textSecondary)
-                    }
-                    if let genre = tune.genre, let bpm = tune.bpm {
-                        Text("\(genre) · \(bpm) BPM · \(tune.key ?? "")")
-                            .font(.footnote).foregroundStyle(CratesColor.textSecondary)
-                    }
-                    if let error = player.playbackError {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.footnote)
-                            .foregroundStyle(CratesColor.red)
-                            .multilineTextAlignment(.center)
-                    }
+                if queueExpanded {
+                    compactHeader(tune)
+                } else {
+                    bigHeader(tune)
                 }
-                .padding(.horizontal)
+
+                if let error = player.playbackError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(CratesColor.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
 
                 scrubber
                 transport
-                queuePanel
+
+                if !queueExpanded { Spacer(minLength: 0) }
+                queueHandle
+                if queueExpanded { queueList }
             } else {
                 ContentUnavailableView("Nothing playing", systemImage: "music.note")
             }
         }
         .padding(.horizontal, CratesMetrics.gutter)
         .presentationDragIndicator(.hidden)
-        .sheet(isPresented: $showQueue) { QueueView() }
     }
 
     private var grabber: some View {
@@ -54,12 +55,53 @@ struct NowPlayingView: View {
             .frame(width: 40, height: 5).padding(.top, 8)
     }
 
+    // MARK: - Header (morphs between states)
+
+    private func bigHeader(_ tune: Tune) -> some View {
+        VStack(spacing: 20) {
+            Artwork(tune: tune, size: 260)
+                .matchedGeometryEffect(id: "art", in: artNamespace)
+                .shadow(color: .black.opacity(0.25), radius: 24, y: 12)
+            VStack(spacing: 6) {
+                Text(tune.displayTitle).font(.title2.bold()).multilineTextAlignment(.center).lineLimit(2)
+                HStack(spacing: 6) {
+                    SourceBadge(source: tune.source)
+                    Text(tune.displayArtist).font(.title3).foregroundStyle(CratesColor.textSecondary)
+                }
+                if let genre = tune.genre, let bpm = tune.bpm {
+                    Text("\(genre) · \(bpm) BPM · \(tune.key ?? "")")
+                        .font(.footnote).foregroundStyle(CratesColor.textSecondary)
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private func compactHeader(_ tune: Tune) -> some View {
+        HStack(spacing: 12) {
+            Artwork(tune: tune, size: 56)
+                .matchedGeometryEffect(id: "art", in: artNamespace)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tune.displayTitle).font(.headline).lineLimit(1)
+                HStack(spacing: 6) {
+                    SourceBadge(source: tune.source)
+                    Text(tune.displayArtist).font(.subheadline)
+                        .foregroundStyle(CratesColor.textSecondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - Scrubber & transport
+
     private var scrubber: some View {
         VStack(spacing: 4) {
             Slider(value: Binding(
                 get: { isScrubbing ? scrubValue : player.currentTime },
                 set: { scrubValue = $0 }
             ), in: 0...max(player.duration, 1)) { editing in
+                if editing { scrubValue = player.currentTime }
                 isScrubbing = editing
                 if !editing { player.seek(to: scrubValue) }
             }
@@ -74,8 +116,6 @@ struct NowPlayingView: View {
         }
     }
 
-    /// One row: mode toggles at the edges, transport in the middle — frees the bottom of the
-    /// sheet for the queue.
     private var transport: some View {
         HStack {
             Button { player.isShuffled.toggle() } label: {
@@ -87,7 +127,7 @@ struct NowPlayingView: View {
             Spacer()
             Button { player.togglePlayPause() } label: {
                 Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 64))
+                    .font(.system(size: queueExpanded ? 54 : 64))
                     .foregroundStyle(CratesColor.accent)
                     .contentTransition(.symbolEffect(.replace))
             }
@@ -104,73 +144,111 @@ struct NowPlayingView: View {
         .padding(.horizontal, 8)
     }
 
-    // MARK: - Embedded queue
+    // MARK: - Up Next (in-place, handle-driven)
 
-    /// The freed bottom space: a handlebar + scrollable Up Next list. Tap a row to jump; grab
-    /// (drag up) or tap the handle to open the full queue sheet with reorder/remove.
-    private var queuePanel: some View {
-        VStack(spacing: 0) {
-            queueHandle
-            if upNext.isEmpty {
-                Text("Nothing up next — swipe right on any track to queue it.")
-                    .font(.footnote).foregroundStyle(CratesColor.textSecondary)
-                    .frame(maxHeight: .infinity, alignment: .center)
-                    .padding(.horizontal)
-            } else {
-                List {
-                    ForEach(upNext) { entry in
-                        QueueRow(tune: entry.tune, isCurrent: false)
-                            .contentShape(.rect)
-                            .onTapGesture {
-                                if let i = player.entries.firstIndex(where: { $0.id == entry.id }) {
-                                    player.jump(to: i)
-                                }
-                            }
-                            .listRowBackground(Color.clear)
-                            .listRowInsets(.init(top: 6, leading: 4, bottom: 6, trailing: 4))
-                    }
-                    .onDelete { offsets in
-                        player.removeFromQueue(at: mappedOffsets(offsets))
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
+    /// The handlebar: swipe up to unfold the queue, swipe down (or tap) to toggle. Everything
+    /// happens in this screen — no sheets, no disclosure chevrons.
     private var queueHandle: some View {
         VStack(spacing: 6) {
             Capsule().fill(CratesColor.textSecondary.opacity(0.35))
-                .frame(width: 36, height: 4)
-            HStack {
+                .frame(width: 44, height: 5)
+            HStack(spacing: 6) {
                 Text("Up Next").font(.headline)
-                if !upNext.isEmpty {
-                    Text("\(upNext.count)").font(.subheadline.monospacedDigit())
+                if !upNextEntries.isEmpty {
+                    Text("\(upNextEntries.count)")
+                        .font(.subheadline.monospacedDigit())
                         .foregroundStyle(CratesColor.textSecondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.up")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(CratesColor.textSecondary)
+                if queueExpanded && !upNextEntries.isEmpty {
+                    Button(editMode == .active ? "Done" : "Edit") {
+                        withAnimation { editMode = editMode == .active ? .inactive : .active }
+                    }
+                    .font(.subheadline)
+                    .tint(CratesColor.accent)
+                }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .contentShape(.rect)
-        .onTapGesture { showQueue = true }
+        .onTapGesture { toggleQueue() }
         .gesture(
-            DragGesture(minimumDistance: 12).onEnded { value in
-                if value.translation.height < -20 { showQueue = true }
-            }
+            DragGesture(minimumDistance: 10)
+                .onEnded { value in
+                    if value.translation.height < -25 { setQueue(expanded: true) }
+                    else if value.translation.height > 25 { setQueue(expanded: false) }
+                }
         )
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel("Open full queue")
+        .accessibilityLabel(queueExpanded ? "Collapse queue" : "Expand queue")
+        .accessibilityIdentifier("queueHandle")
     }
 
+    private var queueList: some View {
+        List {
+            if !manualBlock.isEmpty {
+                Section("Added to Queue") {
+                    queueRows(manualBlock, baseIndex: upNextStart)
+                }
+            }
+            if !contextBlock.isEmpty {
+                Section(manualBlock.isEmpty && player.contextName == nil ? "" : contextHeader) {
+                    queueRows(contextBlock, baseIndex: upNextStart + manualBlock.count)
+                }
+            }
+            if upNextEntries.isEmpty {
+                Text("Nothing up next — swipe right on any track to queue it.")
+                    .font(.footnote).foregroundStyle(CratesColor.textSecondary)
+                    .listRowBackground(Color.clear)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .environment(\.editMode, $editMode)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private func queueRows(_ block: [QueueEntry], baseIndex: Int) -> some View {
+        ForEach(block) { entry in
+            QueueRow(tune: entry.tune)
+                .contentShape(.rect)
+                .onTapGesture {
+                    if let i = player.entries.firstIndex(where: { $0.id == entry.id }) {
+                        player.jump(to: i)
+                    }
+                }
+                .listRowInsets(.init(top: 8, leading: 4, bottom: 8, trailing: 4))
+        }
+        .onDelete { offsets in
+            player.removeFromQueue(at: IndexSet(offsets.map { $0 + baseIndex }))
+        }
+        .onMove { source, destination in
+            player.moveInQueue(from: IndexSet(source.map { $0 + baseIndex }),
+                               to: destination + baseIndex)
+        }
+    }
+
+    private var contextHeader: String {
+        player.contextName.map { "From \($0)" } ?? "Up Next"
+    }
+
+    private func toggleQueue() { setQueue(expanded: !queueExpanded) }
+
+    private func setQueue(expanded: Bool) {
+        withAnimation(.snappy(duration: 0.35)) {
+            queueExpanded = expanded
+            if !expanded { editMode = .inactive }
+        }
+    }
+
+    // MARK: - Queue slices
+
     private var upNextStart: Int { (player.currentIndex ?? -1) + 1 }
-    private var upNext: [QueueEntry] { Array(player.entries.dropFirst(upNextStart)) }
-    private func mappedOffsets(_ offsets: IndexSet) -> IndexSet { IndexSet(offsets.map { $0 + upNextStart }) }
+    private var upNextEntries: [QueueEntry] { Array(player.entries.dropFirst(upNextStart)) }
+    /// Manual additions (play-next + queued) directly after the current track — the controller
+    /// keeps them ahead of the remaining context (see PlaybackController's ordering invariant).
+    private var manualBlock: [QueueEntry] { Array(upNextEntries.prefix(while: { $0.origin != .context })) }
+    private var contextBlock: [QueueEntry] { Array(upNextEntries.dropFirst(manualBlock.count)) }
 
     private func cycleRepeat() {
         player.repeatMode = switch player.repeatMode {
