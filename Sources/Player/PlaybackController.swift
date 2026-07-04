@@ -348,7 +348,13 @@ final class PlaybackController {
         artworkTask = Task { [weak self] in
             guard let (data, _) = try? await URLSession.shared.data(from: url),
                   let image = UIImage(data: data), !Task.isCancelled else { return }
-            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            // The request handler must NOT be MainActor-isolated (the implicit default inside
+            // this class): MediaPlayer calls it on its own accessQueue when the lock screen
+            // renders, and the runtime isolation check traps — EXC_BREAKPOINT on every real
+            // track with cover art (found via on-device crash log, 2026-07-04). UIImage is
+            // immutable here, so handing it across is safe.
+            nonisolated(unsafe) let artworkImage = image
+            let artwork = MPMediaItemArtwork(boundsSize: artworkImage.size) { @Sendable _ in artworkImage }
             guard let self, self.current?.coverID == coverID else { return }
             self.currentArtwork = (coverID, artwork)
             self.updateNowPlaying()

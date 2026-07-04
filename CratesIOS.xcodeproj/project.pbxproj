@@ -21,6 +21,7 @@
 		4BCC4D71EDEA4A5F21AEF965 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4659819F5C7E80A983E315C9 /* SmokeTests.swift */; };
 		4BD03C3563838B89F02AD95B /* SyncClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48276B96A37B5A810C48BC1 /* SyncClient.swift */; };
 		5792D7435E2690E3A30CD6E5 /* CratesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92634E2CAEE31F32B9CBF97 /* CratesApp.swift */; };
+		616BD4C3957217B27F137B53 /* LivePlayTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B0D37223E35F3E60E14B6B /* LivePlayTest.swift */; };
 		6506251F8EE057C483DA7597 /* TrackSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5C740E1B0001B9CCA78AF6 /* TrackSource.swift */; };
 		69B9F44E5EC77BDE65BBA88B /* TrackRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBF48485281E435434369C0 /* TrackRow.swift */; };
 		6A31E1A7D591475AB07D57A0 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC00D64A8A0FD34A11896FF /* NowPlayingView.swift */; };
@@ -100,6 +101,7 @@
 		82E512AF12151A31692C31BA /* Tune.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tune.swift; sourceTree = "<group>"; };
 		9531702C1597A6D684CAB237 /* Crate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crate.swift; sourceTree = "<group>"; };
 		9FE5ACC091E29F4EC940BBFB /* DownloadPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPolicyView.swift; sourceTree = "<group>"; };
+		A0B0D37223E35F3E60E14B6B /* LivePlayTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePlayTest.swift; sourceTree = "<group>"; };
 		A456A4D9CBF7C3EB501DC039 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
 		B97A148B98248F4F4CBFAE43 /* LivePairingTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePairingTest.swift; sourceTree = "<group>"; };
 		CCF28E3976FF11B2DAAAC3BD /* QueueLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueLogicTests.swift; sourceTree = "<group>"; };
@@ -160,6 +162,7 @@
 			isa = PBXGroup;
 			children = (
 				B97A148B98248F4F4CBFAE43 /* LivePairingTest.swift */,
+				A0B0D37223E35F3E60E14B6B /* LivePlayTest.swift */,
 				0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */,
 				2986BFF1004568DA5842224F /* ScreenshotTests.swift */,
 				4659819F5C7E80A983E315C9 /* SmokeTests.swift */,
@@ -516,6 +519,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2C3DA8211F82FD862B5D00BC /* LivePairingTest.swift in Sources */,
+				616BD4C3957217B27F137B53 /* LivePlayTest.swift in Sources */,
 				8DBAF9E08293DCC21C862AB0 /* RealLibraryShotTest.swift in Sources */,
 				B8B1C46428339E1A98852AC0 /* ScreenshotTests.swift in Sources */,
 				4BCC4D71EDEA4A5F21AEF965 /* SmokeTests.swift in Sources */,

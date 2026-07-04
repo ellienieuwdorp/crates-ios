@@ -92,6 +92,7 @@ struct CrateDetailView: View {
                     Divider()
                     Button { showPolicy = true } label: { Label("Offline Download…", systemImage: "arrow.down.circle") }
                 } label: { Image(systemName: "ellipsis.circle") }
+                    .accessibilityIdentifier("crateMenu")
             }
         }
         .sheet(isPresented: $showPolicy) {
