@@ -18,8 +18,10 @@ struct TrackRow: View {
 
     enum QueueAction: Equatable { case queued, playNext }
 
-    /// Unstreamable AND not downloaded: nothing on this phone can play it — say so up front.
-    private var isUnplayable: Bool { tune.knownUnstreamable && !isDownloaded }
+    /// Unstreamable, not downloaded, AND no client-side preview: nothing on this phone can
+    /// play it — say so up front. Bandcamp tunes with a page resolve to a live preview.
+    private var isUnplayable: Bool { tune.knownUnstreamable && !isDownloaded && !tune.hasPreviewSource }
+    private var isPreviewOnly: Bool { tune.knownUnstreamable && !isDownloaded && tune.hasPreviewSource }
 
     var body: some View {
         HStack(spacing: CratesMetrics.rowSpacing) {
@@ -43,6 +45,9 @@ struct TrackRow: View {
                             .lineLimit(1)
                         if let bpm = tune.bpm, bpm != "—" {
                             Text("· \(bpm) BPM")
+                        }
+                        if isPreviewOnly {
+                            Text("· Preview") // streams live from Bandcamp, not the server
                         }
                     }
                 }

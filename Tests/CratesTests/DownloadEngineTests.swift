@@ -101,7 +101,9 @@ struct DownloadEngineTests {
         #expect(url != nil)
         if let url {
             let size = ((try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0) ?? 0
-            #expect(size > 100_000, "installed file suspiciously small (\(size) bytes)")
+            // The point is to catch an installed JSON/HTML error body (a few hundred bytes),
+            // not to assert a bitrate — short tracks are legitimately small.
+            #expect(size > 5_000, "installed file suspiciously small (\(size) bytes) — possible error body")
             #expect(url.pathExtension != "audio") // real extension from Content-Disposition
         }
     }

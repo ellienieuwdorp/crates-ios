@@ -106,6 +106,13 @@ final class PlaybackController {
     /// lands so the scrubber doesn't snap back to pre-seek times.
     private var pendingSeekTarget: Double?
 
+    /// Async preview resolution in flight (Bandcamp). Cancelled on every track change.
+    @ObservationIgnored private var resolveTask: Task<Void, Never>?
+    /// Seam so tests can stub resolution without touching the network.
+    @ObservationIgnored var previewResolver: @Sendable (Tune) async throws -> URL = { tune in
+        try await BandcampResolver.shared.resolve(tune)
+    }
+
     // MARK: Persistence state
     /// Which world the queue belongs to; nil disables persistence entirely (pre-bootstrap,
     /// hermetic UI tests). Set by AppModel.
@@ -396,6 +403,10 @@ final class PlaybackController {
     }
 
     func pause() {
+        // Cancel any in-flight preview resolve: without this, a resolve that lands after the
+        // user (or an interruption) paused would barge audio in. Cancelling leaves the track
+        // in the primed-paused shape; resume() rebuilds from currentTime and re-coalesces.
+        resolveTask?.cancel(); resolveTask = nil
         player?.pause(); isPlaying = false; updateNowPlaying()
         saveQueueNow() // pause is a natural checkpoint — never lose the position here
     }
@@ -407,6 +418,7 @@ final class PlaybackController {
         currentIndex = nil; isPlaying = false
         currentTime = 0; duration = 0; playbackError = nil
         pendingSeekTarget = nil
+        resolveTask?.cancel(); resolveTask = nil
         artworkTask?.cancel(); artworkTask = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
@@ -458,27 +470,69 @@ final class PlaybackController {
         currentIndex = index
         playbackError = nil
         pendingSeekTarget = nil
+        resolveTask?.cancel()
         let tune = entries[index].tune
         currentTime = resumeTime
         duration = tune.lengthSeconds ?? 0
 
-        guard let url = resolvePlaybackURL(for: tune) else {
-            // No local file and no configured server: same stranding shape as a failed
-            // stream, so it takes the same auto-skip path (recursion is bounded by the
-            // lap guard — an entirely offline queue stops after one pass, honestly).
-            removeObservers()
-            player?.replaceCurrentItem(with: nil)
-            handlePlaybackFailure("Not available — no server connection and not downloaded.")
+        if let url = resolvePlaybackURL(for: tune) {
+            beginEngine(tune: tune, url: url, resumeTime: resumeTime, attachAuth: !url.isFileURL)
             return
         }
 
+        if BandcampResolver.canResolve(tune) {
+            // Bandcamp preview (dogfood: online-source previews): resolve the stream URL
+            // client-side — the same mechanism the desktop uses — then play natively.
+            removeObservers()
+            player?.replaceCurrentItem(with: nil)
+            player = nil // so resume() during the resolve re-enters startPlayback, not a dead item
+            isPlaying = false
+            updateNowPlaying()
+            loadArtwork(for: tune)
+            let entryID = entries[index].id
+            let resolve = previewResolver
+            // Explicit @MainActor: state mutation + engine spin-up must land on the actor
+            // (this target compiles in Swift 5 mode, so inference slips are warnings only).
+            resolveTask = Task { @MainActor [weak self] in
+                do {
+                    let url = try await resolve(tune)
+                    guard let self, !Task.isCancelled, self.currentEntry?.id == entryID else { return }
+                    // Honor user intent formed DURING the resolve (a pause/interruption cancels
+                    // resolveTask, so reaching here means play is still wanted) and pick up any
+                    // scrub that happened while resolving via the live currentTime.
+                    // attachAuth false is load-bearing: NEVER send the server's bearer token
+                    // to an external CDN.
+                    self.beginEngine(tune: tune, url: url, resumeTime: self.currentTime, attachAuth: false)
+                } catch {
+                    guard let self, !Task.isCancelled, self.currentEntry?.id == entryID else { return }
+                    self.handlePlaybackFailure("Preview unavailable — the artist may have disabled streaming.")
+                }
+            }
+            return
+        }
+
+        // No local file, no server audio, no preview: same stranding shape as a failed
+        // stream, so it takes the same auto-skip path (recursion is bounded by the lap
+        // guard — an entirely dead queue stops after one pass, honestly).
+        removeObservers()
+        player?.replaceCurrentItem(with: nil)
+        // Distinguish "the server has no audio for this tune" (online import we can't preview)
+        // from "we can't reach the server" — the old message claimed the latter for both.
+        let message = (connection?.isConfigured == true && tune.knownUnstreamable)
+            ? "\(tune.source.label) only — no audio file on the server."
+            : "Not available — no server connection and not downloaded."
+        handlePlaybackFailure(message)
+    }
+
+    /// The actual AVPlayer engine spin-up, shared by the direct and resolved-preview paths.
+    private func beginEngine(tune: Tune, url: URL, resumeTime: Double, attachAuth: Bool) {
+        pendingSeekTarget = nil // any seek issued during a resolve is folded into resumeTime
         let asset: AVURLAsset
-        if url.isFileURL {
+        if url.isFileURL || !attachAuth {
             asset = AVURLAsset(url: url)
         } else {
             // Attach the bearer header to the streaming asset (AVURLAsset can't read it otherwise).
-            let headers = connection?.authHeader ?? [:]
-            asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+            asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": connection?.authHeader ?? [:]])
         }
         let item = AVPlayerItem(asset: asset)
 
@@ -495,9 +549,12 @@ final class PlaybackController {
         scheduleSave()
     }
 
-    /// Local file wins if downloaded; otherwise stream by tune id (Philosophy #4/#5).
+    /// Local file wins if downloaded; otherwise stream by tune id (Philosophy #4/#5). Tunes the
+    /// server is KNOWN to refuse (codec-null) return nil so the preview path can take over
+    /// instead of burning a doomed request.
     private func resolvePlaybackURL(for tune: Tune) -> URL? {
         if let local = downloads?.localFileURL(for: tune.id) { return local }
+        guard tune.hasServerAudio != false else { return nil }
         guard let conn = connection, conn.isConfigured else { return nil }
         return conn.streamURL(tuneID: tune.id)
     }
@@ -553,6 +610,11 @@ final class PlaybackController {
         isPlaying = false
         playbackError = message
         updateNowPlaying()
+        if let current, current.source == .bandcamp {
+            // Likely an expired signed URL — drop it so the next attempt re-resolves fresh.
+            let id = current.id
+            Task.detached { await BandcampResolver.shared.invalidate(id) }
+        }
         consecutiveFailures += 1
         guard consecutiveFailures < max(entries.count, 1) else { return } // full dead lap — stop honestly
         advance(honorRepeatOne: false) // never honorRepeatOne: repeat-one would re-seek the dead item forever
