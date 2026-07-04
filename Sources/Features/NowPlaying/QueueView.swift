@@ -25,6 +25,7 @@ struct QueueRow: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(CratesColor.textSecondary)
         }
+        .opacity(tune.knownUnstreamable ? 0.45 : 1)
         .padding(.vertical, 2)
     }
 }

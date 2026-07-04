@@ -17,6 +17,13 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
     var dateAdded: Date?
     var source: TrackSource
     var pageURL: String?
+    /// Whether the SERVER can stream this tune (an AudioFiles row with a codec exists).
+    /// nil = unknown (stale pre-round-4 cache) — treat unknown as playable, never dim on a guess.
+    var hasServerAudio: Bool?
+
+    /// Honest playability: unplayable only when we know the server has no audio for it.
+    /// (A local download would still play — callers overlay that separately.)
+    var knownUnstreamable: Bool { hasServerAudio == false }
 
     /// Display title falling back to filename-ish server fields when tags are empty.
     var displayTitle: String { title.isEmpty ? "Untitled" : title }
@@ -40,6 +47,7 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
         var genre: String?; var lengthSeconds: Double?; var bpm: String?; var key: String?
         var rating: Int?; var coverID: Int64?; var dateAdded: Date?
         var source: TrackSource; var pageURL: String?
+        var hasServerAudio: Bool? = nil // v1 caches lack it → decodes nil (unknown)
     }
 
     init(from decoder: Decoder) throws {
@@ -49,6 +57,7 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
             genre = cached.genre; lengthSeconds = cached.lengthSeconds; bpm = cached.bpm
             key = cached.key; rating = cached.rating; coverID = cached.coverID
             dateAdded = cached.dateAdded; source = cached.source; pageURL = cached.pageURL
+            hasServerAudio = cached.hasServerAudio
             return
         }
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -70,6 +79,7 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
         // real POC resolves `defaultAudioSourceType` against /audiosource/types at runtime.
         let purchased = try c.decodeFlexibleInt(.purchasedFrom)
         source = Tune.sourceFromStoreID(purchased)
+        hasServerAudio = nil // REST shape carries no AudioFiles join
     }
 
     func encode(to encoder: Encoder) throws {
@@ -77,18 +87,20 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
         try c.encode(CachedTune(
             id: id, title: title, artist: artist, album: album, genre: genre,
             lengthSeconds: lengthSeconds, bpm: bpm, key: key, rating: rating,
-            coverID: coverID, dateAdded: dateAdded, source: source, pageURL: pageURL))
+            coverID: coverID, dateAdded: dateAdded, source: source, pageURL: pageURL,
+            hasServerAudio: hasServerAudio))
     }
 
     /// Direct memberwise init for previews / tests / cache reconstruction.
     init(id: Int64, title: String, artist: String, album: String = "",
          genre: String? = nil, lengthSeconds: Double? = nil, bpm: String? = nil,
          key: String? = nil, rating: Int? = nil, coverID: Int64? = nil,
-         dateAdded: Date? = nil, source: TrackSource = .unknown, pageURL: String? = nil) {
+         dateAdded: Date? = nil, source: TrackSource = .unknown, pageURL: String? = nil,
+         hasServerAudio: Bool? = nil) {
         self.id = id; self.title = title; self.artist = artist; self.album = album
         self.genre = genre; self.lengthSeconds = lengthSeconds; self.bpm = bpm; self.key = key
         self.rating = rating; self.coverID = coverID; self.dateAdded = dateAdded
-        self.source = source; self.pageURL = pageURL
+        self.source = source; self.pageURL = pageURL; self.hasServerAudio = hasServerAudio
     }
 
     static func sourceFromStoreID(_ id: Int?) -> TrackSource {

@@ -87,6 +87,12 @@ struct BackupImporterTests {
         // Bandcamp source derived from type 5.
         #expect(crate2?.last?.source == .bandcamp)
 
+        // Playability: tune 101 has an AudioFiles row with a codec; 102 has none — the server
+        // would refuse to stream it ("Codec of the tune is null"), so rows dim it up front.
+        #expect(solar?.hasServerAudio == true)
+        #expect(crate2?.last?.hasServerAudio == false)
+        #expect(crate2?.last?.knownUnstreamable == true)
+
         #expect(snap.tuneCount == 2)
     }
 

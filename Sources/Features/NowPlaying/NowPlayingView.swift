@@ -51,6 +51,9 @@ struct NowPlayingView: View {
         }
         .presentationDetents([collapsedDetent, .large], selection: detentSelection)
         .presentationDragIndicator(.visible)
+        // Expanded: a hard downward fling settles at the collapsed detent instead of blowing
+        // through it and dismissing the player. Collapsed: swipe-down still dismisses.
+        .interactiveDismissDisabled(queueExpanded)
     }
 
     // MARK: - One layout for both detents
@@ -62,34 +65,54 @@ struct NowPlayingView: View {
     // animated deltas are small local motions; the detent animation carries the rest.
 
     private func playerLayout(_ tune: Tune) -> some View {
-        VStack(spacing: 0) {
+        ScrollViewReader { proxy in
             VStack(spacing: 0) {
-                morphingHeader(tune)
-                    .padding(.top, queueExpanded ? 24 : 28)
-                scrubber
-                    .padding(.top, queueExpanded ? 16 : 20)
-                transport
-                    .padding(.top, queueExpanded ? 8 : 12)
-                queueHandle
-                    .padding(.top, queueExpanded ? 12 : 16)
-                    .padding(.bottom, queueExpanded ? 0 : 4)
-            }
-            .padding(.horizontal, inset)
-            .frame(maxWidth: .infinity)
-            .fixedSize(horizontal: false, vertical: true) // hug intrinsic height for measurement
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                guard !queueExpanded else { return } // only the collapsed shape defines the detent
-                let measured = height.rounded(.up)
-                guard abs(measured - collapsedHeight) >= 1 else { return } // ignore float jitter
-                // Animate so content growth (title wrap, error line) resizes the sheet
-                // smoothly instead of snapping a frame later.
-                withAnimation(.snappy(duration: 0.3)) { collapsedHeight = measured }
-            }
+                VStack(spacing: 0) {
+                    morphingHeader(tune)
+                        .padding(.top, queueExpanded ? 24 : 28)
+                    scrubber
+                        .padding(.top, queueExpanded ? 16 : 20)
+                    transport(scrollProxy: proxy)
+                        .padding(.top, queueExpanded ? 8 : 12)
+                    queueHandle
+                        .padding(.top, queueExpanded ? 12 : 16)
+                        .padding(.bottom, queueExpanded ? 0 : 4)
+                }
+                .padding(.horizontal, inset)
+                .frame(maxWidth: .infinity)
+                .fixedSize(horizontal: false, vertical: true) // hug intrinsic height for measurement
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    guard !queueExpanded else { return } // only the collapsed shape defines the detent
+                    let measured = height.rounded(.up)
+                    guard abs(measured - collapsedHeight) >= 1 else { return } // ignore float jitter
+                    // Animate so content growth (title wrap, error line) resizes the sheet
+                    // smoothly instead of snapping a frame later.
+                    withAnimation(.snappy(duration: 0.3)) { collapsedHeight = measured }
+                }
 
-            queueList
-                .allowsHitTesting(queueExpanded) // clipped below the fold when collapsed
+                queueList
+                    .allowsHitTesting(queueExpanded) // clipped below the fold when collapsed
+                    .overlay(alignment: .bottomTrailing) {
+                        // One-handed collapse: the system already turns a list-top pull into a
+                        // detent drag, but mid-list you'd have to scroll up first — this floats
+                        // in the thumb zone instead.
+                        if queueExpanded {
+                            Button { setQueue(expanded: false) } label: {
+                                Image(systemName: "chevron.down")
+                                    .font(.body.weight(.semibold))
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(.circle)
+                            }
+                            .buttonStyle(.plain)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                            .padding(.trailing, inset)
+                            .padding(.bottom, 12)
+                            .accessibilityLabel("Collapse queue")
+                        }
+                    }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     /// The one Artwork, morphing 264↔64 inside an AnyLayout (VStack under ↔ HStack beside);
@@ -224,9 +247,19 @@ struct NowPlayingView: View {
     /// treatment throughout — primary when off, accent when on — so shuffle/repeat don't read
     /// as disabled next to the filled prev/next glyphs. Sizes identical in both detents so the
     /// morph doesn't re-scale the controls.
-    private var transport: some View {
+    private func transport(scrollProxy: ScrollViewProxy) -> some View {
         HStack(spacing: 0) {
-            Button { player.toggleShuffle() } label: {
+            Button {
+                // Same transaction for the reorder, the edit-mode exit, and the scroll: rows
+                // travel to their new slots instead of the list snapping (dogfood round 4, I5).
+                withAnimation(.snappy(duration: 0.35)) {
+                    editMode = .inactive // mutating under an in-flight reorder drag is a glitch source
+                    player.toggleShuffle()
+                    if queueExpanded, let first = upNextEntries.first?.id {
+                        scrollProxy.scrollTo(first, anchor: .top)
+                    }
+                }
+            } label: {
                 Image(systemName: "shuffle").font(.title3.weight(.semibold))
                     .foregroundStyle(player.isShuffled ? CratesColor.accent : .primary)
             }

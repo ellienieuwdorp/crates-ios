@@ -172,7 +172,10 @@ enum BackupImporter {
                 coverID: r.CoverID,
                 dateAdded: Tune.parseDate(r.DateAdded),
                 source: Backup.source(forTypeID: r.DefaultAudioSourceType, location: r.TuneDefaultLocation),
-                pageURL: r.PageUrl
+                pageURL: r.PageUrl,
+                // The server refuses to stream tunes without a codec ("Codec of the tune is
+                // null") — mark them so rows can be honest up front instead of tap → error.
+                hasServerAudio: audio?.Codec != nil
             )
         }
 

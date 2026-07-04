@@ -17,6 +17,9 @@ struct TrackRow: View {
 
     enum QueueAction: Equatable { case queued, playNext }
 
+    /// Unstreamable AND not downloaded: nothing on this phone can play it — say so up front.
+    private var isUnplayable: Bool { tune.knownUnstreamable && !isDownloaded }
+
     var body: some View {
         HStack(spacing: CratesMetrics.rowSpacing) {
             Artwork(tune: tune)
@@ -31,10 +34,15 @@ struct TrackRow: View {
                     .lineLimit(1)
                 HStack(spacing: 5) {
                     SourceBadge(source: tune.source)
-                    Text(tune.displayArtist)
-                        .lineLimit(1)
-                    if let bpm = tune.bpm, bpm != "—" {
-                        Text("· \(bpm) BPM")
+                    if isUnplayable {
+                        Text("\(tune.source.label) only — no audio file")
+                            .lineLimit(1)
+                    } else {
+                        Text(tune.displayArtist)
+                            .lineLimit(1)
+                        if let bpm = tune.bpm, bpm != "—" {
+                            Text("· \(bpm) BPM")
+                        }
                     }
                 }
                 .font(.subheadline)
@@ -54,6 +62,7 @@ struct TrackRow: View {
                 }
             }
         }
+        .opacity(isUnplayable ? 0.45 : 1) // honest: this row can't produce sound on this phone
         .contentShape(.rect)
         .onTapGesture(perform: onTap)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {

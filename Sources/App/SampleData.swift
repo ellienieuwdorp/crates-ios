@@ -15,10 +15,16 @@ enum SampleData {
     static func tune(_ id: Int64, _ title: String, _ artist: String, _ album: String,
                      _ len: Double, _ bpm: String, _ key: String, _ genre: String,
                      _ source: TrackSource, _ daysAgo: Int, _ rating: Int? = nil) -> Tune {
-        Tune(id: id, title: title, artist: artist, album: album, genre: genre,
-             lengthSeconds: len, bpm: bpm, key: key, rating: rating, coverID: id,
-             dateAdded: Date(timeIntervalSinceNow: -Double(daysAgo) * 86_400),
-             source: source, pageURL: nil)
+        // Streaming-only imports (YouTube/Spotify rips without an audio file) mirror the real
+        // library's codec-null tunes, so the dimmed unplayable treatment is visible in demo.
+        let hasAudio: Bool = switch source {
+        case .youtube, .spotify, .unknown: false
+        default: true
+        }
+        return Tune(id: id, title: title, artist: artist, album: album, genre: genre,
+                    lengthSeconds: len, bpm: bpm, key: key, rating: rating, coverID: id,
+                    dateAdded: Date(timeIntervalSinceNow: -Double(daysAgo) * 86_400),
+                    source: source, pageURL: nil, hasServerAudio: hasAudio)
     }
 
     static let tunesByCrate: [Int64: [Tune]] = [

@@ -4,22 +4,20 @@ import SwiftUI
 /// play/pause control, and expands to the full Now Playing screen on tap. The Liquid Glass
 /// material comes from the tab bar accessory itself, so this stays visually light.
 ///
-/// Sizing (dogfood round 3, W4): iOS 26's accessory capsule imposes a ~48pt height and centers
-/// hugging content; the iOS 27 beta derives capsule height FROM the content — bare content with
-/// no vertical sizing collapsed into a short, flimsy pill. The frame sandwich below produces
-/// the same ~48pt centered pill under both contracts: fill whatever is proposed, floor at 48.
+/// Metrics (dogfood round 4, measured — probe app + Apple Music screenshot analysis): the
+/// system slot is a hard 48pt (content taller than 48 gets CLIPPED on iOS 26; Music's pill is
+/// the same 48). Music's density, not fullness, is what reads premium: 30pt art with ~9pt of
+/// air, 14pt leading inset, footnote subtitle, bare primary-color glyphs on 44pt hit targets.
+/// The fill-then-floor sandwich keeps iOS 26 (system imposes 48) and iOS 27 (capsule hugs
+/// content) producing the identical pill.
 struct MiniPlayerView: View {
     @Environment(PlaybackController.self) private var player
-    /// Resolved pill height, measured — drives the Apple-Music-style near-full-height art.
-    @State private var accessoryHeight: CGFloat = 48
     var onExpand: () -> Void
 
-    /// Art nearly fills the capsule (~6pt inset top/bottom). Clamped so a stale measurement
-    /// can never inflate the layout (iOS 27 hug mode makes the measurement self-referential).
-    private var artSize: CGFloat { min(48, max(36, accessoryHeight - 12)) }
+    private let artSize: CGFloat = 30 // Music: ~30pt in the 48pt slot
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             if player.current == nil {
                 // Idle state: the accessory stays attached so the tab view's identity never
                 // changes when playback starts (see RootView).
@@ -30,54 +28,55 @@ struct MiniPlayerView: View {
                 Text("Not Playing")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(CratesColor.textSecondary)
-                Spacer(minLength: 4)
+                Spacer(minLength: 8)
             }
             if let tune = player.current {
                 Artwork(tune: tune, size: artSize)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(tune.displayTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
+                VStack(alignment: .leading, spacing: 1.5) {
+                    Text(tune.displayTitle)
+                        .font(.subheadline.weight(.semibold)).lineLimit(1)
                     if player.playbackError != nil {
                         Label("Can't play — tap for details", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption).foregroundStyle(CratesColor.red).lineLimit(1)
+                            .font(.footnote).foregroundStyle(CratesColor.red).lineLimit(1)
                     } else {
-                        Text(tune.displayArtist).font(.caption).foregroundStyle(CratesColor.textSecondary).lineLimit(1)
+                        Text(tune.displayArtist)
+                            .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
-                Spacer(minLength: 4)
+                Spacer(minLength: 8)
                 Button {
                     player.togglePlayPause()
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title3)
-                        .foregroundStyle(CratesColor.accent)
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(.primary) // Music uses primary here, not accent
                         .contentTransition(.symbolEffect(.replace))
-                        .frame(width: 36)
-                        .frame(maxHeight: .infinity) // full-pill hit target (44pt+ HIG)
+                        .frame(width: 44)
+                        .frame(maxHeight: .infinity)
                 }
                 .buttonStyle(.plain)
-                // An unplayable current track must not show a fully-enabled play button —
-                // the affordance would contradict the error one line away. Next stays live
-                // (the queue may hold playable tracks).
+                // An unplayable current track must not show a fully-enabled play button.
                 .disabled(player.playbackError != nil)
                 .opacity(player.playbackError != nil ? 0.35 : 1)
                 Button {
                     player.next()
                 } label: {
-                    Image(systemName: "forward.fill").font(.body)
-                        .frame(width: 32)
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44)
                         .frame(maxHeight: .infinity)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 8)
-        // Order is load-bearing (see header comment):
+        .padding(.leading, 14) // Music's leading inset; trailing air comes from the 44pt frames
+        .padding(.trailing, 2)
+        // Order is load-bearing:
         // 1. fill what the capsule proposes → content vertically centers (iOS 26);
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // 2. floor so a hugging capsule (iOS 27) still comes out tab-bar-scale;
+        // 2. floor so a hugging capsule (iOS 27) still comes out at the system 48pt.
         .frame(minHeight: 48)
-        // 3. measure the resolved height → art tracks the real capsule size.
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { accessoryHeight = $0 }
         .contentShape(.rect)
         .onTapGesture(perform: onExpand)
         .accessibilityIdentifier("miniPlayer")

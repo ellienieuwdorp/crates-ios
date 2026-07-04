@@ -55,9 +55,13 @@ extension View {
     /// insets correctly, which is why the simulator never showed the overlap. Explicit bottom
     /// clearance for every scrollable in the tab, gated to 27+ so 26 doesn't double-inset.
     /// Applied per-tab (not on the TabView) so presented sheets don't inherit the margin.
+    ///
+    /// 60 = pill 48 + system gap 12: symmetric 12pt above/below the pill (the earlier 72 left
+    /// ~24pt above vs 12 below — the "inconsistent padding" report). Verify on device when
+    /// reconnected; the system's own iOS 26 layout is flush-above (0pt) + scroll-edge fade.
     @ViewBuilder func miniPlayerClearance() -> some View {
         if #available(iOS 27, *) {
-            contentMargins(.bottom, 72, for: .scrollContent)
+            contentMargins(.bottom, 60, for: .scrollContent)
         } else {
             self
         }
