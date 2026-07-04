@@ -12,8 +12,10 @@ import SwiftUI
 ///   • `red`             danger.
 ///
 /// Surfaces are a warm near-black charcoal in dark (#141412 / #201F1B — matching the desktop) and
-/// warm "paper" in light (#F4F1E8 / #FFFDF8). Accents are brightened in dark mode so text/icons
-/// clear WCAG AA on charcoal. The app supports both schemes; dark is the signature Crates look.
+/// neutral in light (#FFFFFF background / #F2F2F7 tiles — the original warm "paper" light mode
+/// read as an off-brand orange tint next to system-white lists; Ellie, 2026-07-04). Accents are
+/// brightened in dark mode so text/icons clear WCAG AA on charcoal. The app supports both
+/// schemes; dark is the signature Crates look.
 enum CratesColor {
     /// Primary interactive/brand color — teal.
     static let accent = Color("CratesTeal")
