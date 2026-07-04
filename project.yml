@@ -1,0 +1,78 @@
+name: CratesIOS
+options:
+  bundleIdPrefix: co.crates.ios
+  deploymentTarget:
+    iOS: "26.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    from: "0.9.19"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    GENERATE_INFOPLIST_FILE: YES
+    # Automatic signing with Ellie's team so builds work on device + simulator.
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: C8N8X74Y27
+
+targets:
+  CratesIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Resources
+    dependencies:
+      - package: ZIPFoundation
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.crates.ios.app
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_UIBackgroundModes: audio
+        INFOPLIST_KEY_NSAppTransportSecurity: ""
+    info:
+      path: Resources/Info.plist
+      properties:
+        UIBackgroundModes:
+          - audio
+        NSLocalNetworkUsageDescription: "Crates needs to find and connect to your Crates server on your local network."
+        NSBonjourServices:
+          - _http._tcp
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+
+  CratesTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/CratesTests
+    dependencies:
+      - target: CratesIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.crates.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  CratesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/CratesUITests
+    dependencies:
+      - target: CratesIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: co.crates.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: CratesIOS
