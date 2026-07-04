@@ -29,6 +29,10 @@ actor DiskCache {
         try? data.write(to: fileURL(key), options: .atomic)
     }
 
+    func remove(_ key: String) {
+        try? FileManager.default.removeItem(at: fileURL(key))
+    }
+
     func clear() {
         try? FileManager.default.removeItem(at: root)
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

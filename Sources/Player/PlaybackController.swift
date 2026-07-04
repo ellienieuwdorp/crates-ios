@@ -4,11 +4,11 @@ import MediaPlayer
 import Observation
 import UIKit
 
-enum RepeatMode: Sendable { case off, all, one }
+enum RepeatMode: String, Codable, Sendable { case off, all, one }
 
 /// How an entry got into the queue. Drives the Up Next split: manual additions (play-next, then
 /// queued) always precede the remaining auto-added context tracks.
-enum QueueOrigin: Sendable, Equatable {
+enum QueueOrigin: String, Codable, Sendable, Equatable {
     /// Swipe-left "play next" — jumps the line, FIFO within its own block.
     case playNext
     /// Swipe-right "add to queue" — after all play-next items, FIFO within its own block.
@@ -26,6 +26,26 @@ struct QueueEntry: Identifiable, Equatable, Sendable {
     init(_ tune: Tune, origin: QueueOrigin = .context) { self.id = UUID(); self.tune = tune; self.origin = origin }
 }
 
+/// Disk snapshot of the queue ("queue_v1"). Runtime UUIDs are process-local, so entry identity
+/// is positional here: `preShuffleOrder` stores indices into `entries` *as saved*, remapped
+/// onto freshly minted UUIDs on restore (before pruning — pruning shifts positions).
+struct PersistedQueue: Codable, Sendable {
+    enum Mode: String, Codable, Sendable { case library, demo }
+    struct Entry: Codable, Sendable {
+        var tune: Tune
+        var origin: QueueOrigin
+    }
+    var v: Int = 1
+    var mode: Mode
+    var entries: [Entry]
+    var currentIndex: Int?
+    var contextName: String?
+    var repeatMode: RepeatMode
+    var isShuffled: Bool
+    var preShuffleOrder: [Int]
+    var currentTime: Double
+}
+
 /// The phone *is* the player (Philosophy #5): its own queue, streaming audio on-device, with full
 /// system media integration. A downloaded local file is always preferred over the stream.
 @MainActor
@@ -40,9 +60,13 @@ final class PlaybackController {
     /// Set when the current track can't be played (no server, stream failed). UI shows it honestly
     /// instead of a fake playing state (Philosophy #7).
     private(set) var playbackError: String? = nil
-    var repeatMode: RepeatMode = .off
+    var repeatMode: RepeatMode = .off {
+        didSet { scheduleSave() } // @Observable preserves property observers
+    }
     /// Toggle only via toggleShuffle() — the flag must never flip without the reorder side
-    /// effect (it was a dead flag once; see docs/design/dogfood-round-3.md W1).
+    /// effect (it was a dead flag once; see docs/design/dogfood-round-3.md W1). restore(from:)
+    /// is the one sanctioned direct assignment: its entries arrive already in shuffled order
+    /// with the un-shuffle snapshot alongside.
     private(set) var isShuffled = false
     /// Original relative order (entry IDs) of the context tracks, snapshotted when shuffle
     /// turns on. Un-shuffling sorts the surviving upcoming context entries back into this order.
@@ -82,6 +106,15 @@ final class PlaybackController {
     /// lands so the scrubber doesn't snap back to pre-seek times.
     private var pendingSeekTarget: Double?
 
+    // MARK: Persistence state
+    /// Which world the queue belongs to; nil disables persistence entirely (pre-bootstrap,
+    /// hermetic UI tests). Set by AppModel.
+    @ObservationIgnored var persistenceMode: PersistedQueue.Mode?
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private var lastSavedTime: Double = 0
+    /// nonisolated: read from detached persistence tasks (precedent: AppModel.cursorKey).
+    private nonisolated static let queueCacheKey = "queue_v1"
+
     init() {
         // Category only — activation waits for the first actual play, so launching the app never
         // silences another app's audio.
@@ -113,6 +146,7 @@ final class PlaybackController {
         var pos = i + 1
         while pos < entries.count, entries[pos].origin != .context { pos += 1 }
         entries.insert(entry, at: pos)
+        scheduleSave()
     }
 
     /// Swipe-left gesture target: play next — goes to the end of the play-next block (FIFO),
@@ -127,6 +161,7 @@ final class PlaybackController {
         var pos = i + 1
         while pos < entries.count, entries[pos].origin == .playNext { pos += 1 }
         entries.insert(entry, at: pos)
+        scheduleSave()
     }
 
     /// Replace the queue and start from a chosen index (e.g. tapping a track in a crate).
@@ -178,6 +213,7 @@ final class PlaybackController {
                 currentIndex = entries.firstIndex(where: { $0.id == cid })
             }
         }
+        scheduleSave()
     }
 
     func moveInQueue(from source: IndexSet, to destination: Int) {
@@ -186,6 +222,115 @@ final class PlaybackController {
         if let cid = currentID {
             currentIndex = entries.firstIndex(where: { $0.id == cid })
         }
+        scheduleSave()
+    }
+
+    // MARK: - Persistence (dogfood round 4, I4)
+
+    /// Debounced structural save — call after any queue/state mutation. The 500ms window
+    /// coalesces bursts (queue-all, multi-remove) into one disk write.
+    private func scheduleSave() {
+        guard persistenceMode != nil else { return }
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            self?.saveQueueNow()
+        }
+    }
+
+    /// Immediate save — pause, background transition, and the 5s position cadence. A stopped
+    /// queue (currentIndex nil) is not restorable, so it never overwrites the last good state.
+    func saveQueueNow() {
+        guard let snapshot = persistedSnapshot() else { return }
+        lastSavedTime = currentTime
+        Task.detached { await DiskCache.shared.save(snapshot, key: Self.queueCacheKey) }
+    }
+
+    private func persistedSnapshot() -> PersistedQueue? {
+        guard let mode = persistenceMode, let index = currentIndex else { return nil }
+        let indexByID = Dictionary(uniqueKeysWithValues: entries.enumerated().map { ($1.id, $0) })
+        return PersistedQueue(
+            mode: mode,
+            entries: entries.map { .init(tune: $0.tune, origin: $0.origin) },
+            currentIndex: index,
+            contextName: contextName,
+            repeatMode: repeatMode,
+            isShuffled: isShuffled,
+            preShuffleOrder: preShuffleOrder.compactMap { indexByID[$0] },
+            currentTime: currentTime)
+    }
+
+    /// Rebuild the queue from a snapshot, PAUSED — primes current/duration/currentTime and the
+    /// system now-playing info WITHOUT creating an AVPlayer; the first resume() builds the
+    /// engine and seeks. No-op on mode mismatch, an already-active queue, or nothing surviving.
+    func restore(from saved: PersistedQueue, mode: PersistedQueue.Mode, validTuneIDs: Set<Int64>? = nil) {
+        persistenceMode = mode
+        guard entries.isEmpty, currentIndex == nil else { return } // user beat the restore
+        guard saved.mode == mode, let savedIndex = saved.currentIndex,
+              saved.entries.indices.contains(savedIndex) else { return }
+
+        let minted = saved.entries.map { QueueEntry($0.tune, origin: $0.origin) }
+        // Remap positional pre-shuffle order onto the fresh UUIDs BEFORE pruning.
+        let mintedPreShuffle = saved.preShuffleOrder.compactMap {
+            minted.indices.contains($0) ? minted[$0].id : nil
+        }
+        let currentID = minted[savedIndex].id
+
+        // Prune tunes deleted since the save (nil = can't validate, trust the snapshot).
+        // The current entry is always kept — its failure path reports honestly if it's gone.
+        let kept: [QueueEntry] = validTuneIDs.map { valid in
+            minted.filter { $0.id == currentID || valid.contains($0.tune.id) }
+        } ?? minted
+        guard let newIndex = kept.firstIndex(where: { $0.id == currentID }) else { return }
+
+        entries = kept
+        currentIndex = newIndex
+        contextName = saved.contextName
+        repeatMode = saved.repeatMode
+        isShuffled = saved.isShuffled // sanctioned direct assignment — see the declaration
+        preShuffleOrder = saved.isShuffled ? mintedPreShuffle : []
+
+        // Paused prime: position + lock-screen metadata, no AVPlayer until resume().
+        isPlaying = false
+        currentTime = saved.currentTime
+        duration = kept[newIndex].tune.lengthSeconds ?? 0
+        lastSavedTime = saved.currentTime
+        updateNowPlaying()
+        loadArtwork(for: kept[newIndex].tune)
+    }
+
+    func restoreQueue(mode: PersistedQueue.Mode, validTuneIDs: Set<Int64>? = nil) async {
+        let saved: PersistedQueue? = await DiskCache.shared.load(Self.queueCacheKey, as: PersistedQueue.self)
+        if let saved {
+            restore(from: saved, mode: mode, validTuneIDs: validTuneIDs)
+        } else {
+            persistenceMode = mode
+        }
+    }
+
+    /// A sync landed: drop queue entries whose tunes no longer exist (the current entry is
+    /// always kept — pruning it would force an autoplay-or-stop decision mid-listen).
+    func pruneDeletedTunes(valid: Set<Int64>) {
+        guard !valid.isEmpty else { return }
+        let currentID = currentEntry?.id
+        let kept = entries.filter { $0.id == currentID || valid.contains($0.tune.id) }
+        guard kept.count != entries.count else { return }
+        entries = kept
+        if let cid = currentID { currentIndex = entries.firstIndex { $0.id == cid } }
+        scheduleSave()
+    }
+
+    func eraseQueuePersistence() {
+        saveTask?.cancel()
+        persistenceMode = nil
+        Task.detached { await DiskCache.shared.remove(Self.queueCacheKey) }
+    }
+
+    /// Test hook: the positional pre-shuffle mapping exactly as persistedSnapshot writes it.
+    var preShuffleOrder_forTesting: [Int] {
+        let indexByID = Dictionary(uniqueKeysWithValues: entries.enumerated().map { ($1.id, $0) })
+        return preShuffleOrder.compactMap { indexByID[$0] }
     }
 
     // MARK: - Shuffle
@@ -205,6 +350,7 @@ final class PlaybackController {
             preShuffleOrder = entries.filter { $0.origin == .context }.map(\.id)
             shuffleUpcomingContext()
         }
+        scheduleSave()
     }
 
     /// Indices after the current track holding auto-added context entries — the only slots
@@ -238,13 +384,20 @@ final class PlaybackController {
     func togglePlayPause() { isPlaying ? pause() : resume() }
 
     func resume() {
-        guard current != nil else { return }
+        guard let i = currentIndex, current != nil else { return }
+        if player == nil {
+            // Primed restore (relaunch) or a prior no-URL failure: build the engine now, from
+            // the primed position — never a fake isPlaying without audio.
+            startPlayback(at: i, from: currentTime)
+            return
+        }
         activateAudioSessionIfNeeded()
         player?.play(); isPlaying = true; updateNowPlaying()
     }
 
     func pause() {
         player?.pause(); isPlaying = false; updateNowPlaying()
+        saveQueueNow() // pause is a natural checkpoint — never lose the position here
     }
 
     func stop() {
@@ -295,17 +448,18 @@ final class PlaybackController {
                 self.pendingSeekTarget = nil
             }
         }
+        scheduleSave()
     }
 
     // MARK: - Engine
 
-    private func startPlayback(at index: Int) {
+    private func startPlayback(at index: Int, from resumeTime: Double = 0) {
         guard entries.indices.contains(index) else { return }
         currentIndex = index
         playbackError = nil
         pendingSeekTarget = nil
         let tune = entries[index].tune
-        currentTime = 0
+        currentTime = resumeTime
         duration = tune.lengthSeconds ?? 0
 
         guard let url = resolvePlaybackURL(for: tune) else {
@@ -335,8 +489,10 @@ final class PlaybackController {
         installObservers(on: item)
         activateAudioSessionIfNeeded()
         p.play(); isPlaying = true
+        if resumeTime > 0 { seek(to: resumeTime) } // AVFoundation queues seeks on loading items
         updateNowPlaying()
         loadArtwork(for: tune)
+        scheduleSave()
     }
 
     /// Local file wins if downloaded; otherwise stream by tune id (Philosophy #4/#5).
@@ -352,6 +508,7 @@ final class PlaybackController {
             guard let self else { return }
             guard self.pendingSeekTarget == nil else { return } // seek in flight — don't fight it
             self.currentTime = t.seconds
+            if abs(self.currentTime - self.lastSavedTime) >= 5 { self.saveQueueNow() } // position cadence
             if self.duration == 0 {
                 let d = item.duration.seconds
                 if d.isFinite, d > 0 { self.duration = d }

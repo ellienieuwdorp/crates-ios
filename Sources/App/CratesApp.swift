@@ -25,6 +25,7 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 struct CratesApp: App {
     @State private var model = AppModel()
     @AppStorage("appearance") private var appearance: AppAppearance = .system
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -36,6 +37,11 @@ struct CratesApp: App {
                 .tint(CratesColor.accent)
                 .preferredColorScheme(appearance.colorScheme)
                 .task { await model.bootstrap() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // The load-bearing save: a debounced write is lost if iOS jetsams the app inside
+            // the 500ms window — and backgrounding is exactly when jetsam happens.
+            if phase == .background { model.player.saveQueueNow() }
         }
     }
 }

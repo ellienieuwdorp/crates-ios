@@ -68,6 +68,7 @@ final class AppModel {
             await client.update(connection: connection)
             wire()
             enterDemoMode()
+            player.persistenceMode = nil // hermetic: no queue state leaks between test runs
             return
         }
         await library.hydrateFromDisk()
@@ -76,6 +77,10 @@ final class AppModel {
         if isPaired {
             // Paired ⇒ the library is backup-synced; disk cache is the source of truth.
             library.markSnapshotBacked()
+            // Restore the queue BEFORE any sync: offline-first. An empty hydrated library
+            // can't validate tunes — pass nil (an empty set would wipe the whole restore).
+            let ids = Set(library.allTunes.map(\.id))
+            await player.restoreQueue(mode: .library, validTuneIDs: ids.isEmpty ? nil : ids)
             if library.rootCrates.isEmpty {
                 try? await runInitialSync()   // first launch after pairing, or cache was cleared
             } else {
@@ -83,6 +88,7 @@ final class AppModel {
             }
         } else {
             enterDemoMode()
+            await player.restoreQueue(mode: .demo)
         }
     }
 
@@ -109,6 +115,7 @@ final class AppModel {
             await client.update(connection: conn)
             AppModel.saveConnection(conn)
             wire()
+            player.persistenceMode = .library // freshly paired sessions persist their queue
             try await runInitialSync()
             onboarding = .done
         } catch {
@@ -137,6 +144,7 @@ final class AppModel {
         library.loadSnapshot(result.snapshot)
         persistSyncArtifacts(result)
         UserDefaults.standard.set(Date(), forKey: AppModel.lastSyncKey)
+        player.pruneDeletedTunes(valid: Set(result.snapshot.allTunes.map(\.id)))
         if !quiet { onboarding = .syncing("Done — \(result.snapshot.tuneCount) tunes", 1.0) }
     }
 
@@ -173,6 +181,7 @@ final class AppModel {
             library.loadSnapshot(result.snapshot)
             persistSyncArtifacts(result, previousCursor: cursor)
             UserDefaults.standard.set(Date(), forKey: AppModel.lastSyncKey)
+            player.pruneDeletedTunes(valid: Set(result.snapshot.allTunes.map(\.id)))
             if !result.changedCoverIDs.isEmpty {
                 let changed = result.changedCoverIDs
                 Task.detached { await ArtworkStore.shared.invalidate(coverIDs: changed) }
@@ -213,6 +222,7 @@ final class AppModel {
 
     func signOut() {
         player.stop()
+        player.eraseQueuePersistence() // a re-pair to a different server could collide on tune IDs
         connection = CratesConnection(host: "", port: CratesConnection.defaultPort, token: "")
         UserDefaults.standard.removeObject(forKey: AppModel.connKey)
         UserDefaults.standard.removeObject(forKey: AppModel.cursorKey) // next pairing starts with a full sync
@@ -226,6 +236,7 @@ final class AppModel {
         isDemo = true
         library.loadDemoData(SampleData.crates, tunesByCrate: SampleData.tunesByCrate)
         pins.configure(demo: true)
+        player.persistenceMode = .demo // demo queues stay in the demo world
     }
 
     // MARK: - Persistence (token → Keychain in a real build)
