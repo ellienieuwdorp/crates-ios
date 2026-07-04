@@ -43,6 +43,11 @@ struct MiniPlayerView: View {
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
+                // An unplayable current track must not show a fully-enabled play button —
+                // the affordance would contradict the error one line away. Next stays live
+                // (the queue may hold playable tracks).
+                .disabled(player.playbackError != nil)
+                .opacity(player.playbackError != nil ? 0.35 : 1)
                 Button {
                     player.next()
                 } label: {

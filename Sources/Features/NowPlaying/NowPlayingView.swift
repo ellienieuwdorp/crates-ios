@@ -1,85 +1,152 @@
 import SwiftUI
 
-/// Full-screen player (Idea #4 v2). Two in-place states, no popups:
+/// Full-screen player (Idea #4 v3 — see docs/design/now-playing-redesign.md). Two in-place
+/// states on a two-detent sheet, no popups:
 ///
-///   • collapsed — big art, title/artist, scrubber, one transport row
-///     (shuffle · back · play · forward · repeat), and the Up Next handlebar resting at the
-///     bottom. The queue stays tucked away.
-///   • expanded — swipe up (or tap) the handlebar: the header morphs into a compact art+title
-///     row, and the queue unfolds below the transport, split into the manual additions
-///     ("Added to Queue") and the remaining auto context ("From <crate>").
+///   • collapsed — the sheet HUGS the content (measured detent): art, title, scrubber, one
+///     transport row, and the Up Next glass pill. iOS 26 floats partial sheets inset with
+///     Liquid Glass corners automatically.
+///   • expanded — tap the pill or drag the sheet up: the header morphs into a compact
+///     art+title row and the queue unfolds, split into "Added to Queue" (manual) and
+///     "From <context>" (auto). The system sheet drag IS the expand/collapse gesture.
 ///
-/// Waveform scrubber and click-through to artist/album are deliberately deferred (Idea #4 "later").
+/// Layout rules: one 24pt gutter for everything (the "transport axis"), 8pt-grid spacing,
+/// transport controls in equal-width slots so the play button is structurally centered, and
+/// exactly one glass element (the handle pill) per HIG layering.
 struct NowPlayingView: View {
     @Environment(PlaybackController.self) private var player
     @State private var queueExpanded = false
     @State private var editMode: EditMode = .inactive
     @State private var scrubValue: Double = 0
     @State private var isScrubbing = false
+    /// Measured height of the hugging collapsed stack — drives the collapsed detent. Seeded
+    /// with a realistic value so the first frame doesn't flash a sliver-height sheet.
+    @State private var collapsedHeight: CGFloat = 560
     @Namespace private var artNamespace
 
+    private let inset: CGFloat = 24
+
+    private var collapsedDetent: PresentationDetent { .height(collapsedHeight) }
+    /// Derived, never stored: PresentationDetent identity is value-based, so the selection must
+    /// always be recomputed from state or a re-measure would orphan it (runtime warning + snap).
+    private var detentSelection: Binding<PresentationDetent> {
+        Binding(
+            get: { queueExpanded ? .large : collapsedDetent },
+            set: { newValue in
+                // Fires once when a user drag settles — animate our content morph in sync.
+                withAnimation(.snappy(duration: 0.35)) {
+                    queueExpanded = (newValue == .large)
+                    if !queueExpanded { editMode = .inactive } // drag-collapse must exit edit like tap-collapse
+                }
+            }
+        )
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
-            grabber
+        Group {
             if let tune = player.current {
-                if queueExpanded {
-                    compactHeader(tune)
-                } else {
-                    bigHeader(tune)
-                }
-
-                if let error = player.playbackError {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote)
-                        .foregroundStyle(CratesColor.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-
-                scrubber
-                transport
-
-                if !queueExpanded { Spacer(minLength: 0) }
-                queueHandle
-                if queueExpanded { queueList }
+                if queueExpanded { expandedLayout(tune) } else { collapsedLayout(tune) }
             } else {
                 ContentUnavailableView("Nothing playing", systemImage: "music.note")
             }
         }
-        .padding(.horizontal, CratesMetrics.gutter)
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([collapsedDetent, .large], selection: detentSelection)
+        .presentationDragIndicator(.visible)
     }
 
-    private var grabber: some View {
-        Capsule().fill(CratesColor.textSecondary.opacity(0.4))
-            .frame(width: 40, height: 5).padding(.top, 8)
-    }
+    // MARK: - Collapsed: content-hugging stack
 
-    // MARK: - Header (morphs between states)
-
-    private func bigHeader(_ tune: Tune) -> some View {
-        VStack(spacing: 20) {
-            Artwork(tune: tune, size: 260)
+    private func collapsedLayout(_ tune: Tune) -> some View {
+        VStack(spacing: 0) {
+            Artwork(tune: tune, size: 264)
                 .matchedGeometryEffect(id: "art", in: artNamespace)
-                .shadow(color: .black.opacity(0.25), radius: 24, y: 12)
-            VStack(spacing: 6) {
-                Text(tune.displayTitle).font(.title2.bold()).multilineTextAlignment(.center).lineLimit(2)
-                HStack(spacing: 6) {
-                    SourceBadge(source: tune.source)
-                    Text(tune.displayArtist).font(.title3).foregroundStyle(CratesColor.textSecondary)
-                }
-                if let genre = tune.genre, let bpm = tune.bpm {
-                    Text("\(genre) · \(bpm) BPM · \(tune.key ?? "")")
-                        .font(.footnote).foregroundStyle(CratesColor.textSecondary)
-                }
+                .shadow(color: .black.opacity(0.22), radius: 20, y: 10)
+                .padding(.top, 28) // clears the system drag indicator
+
+            titleBlock(tune)
+                .padding(.top, 20)
+
+            scrubber
+                .padding(.top, 20)
+
+            transport
+                .padding(.top, 12)
+
+            queueHandle
+                .padding(.top, 16)
+                .padding(.bottom, 4)
+        }
+        .padding(.horizontal, inset)
+        .frame(maxWidth: .infinity)
+        .fixedSize(horizontal: false, vertical: true) // hug intrinsic height for measurement
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            let measured = height.rounded(.up)
+            guard abs(measured - collapsedHeight) >= 1 else { return } // ignore float jitter
+            // Animate so content growth (title wrap, error line) resizes the sheet smoothly
+            // instead of snapping a frame later.
+            withAnimation(.snappy(duration: 0.3)) { collapsedHeight = measured }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func titleBlock(_ tune: Tune) -> some View {
+        VStack(spacing: 4) {
+            Text(tune.displayTitle).font(.title2.bold()).multilineTextAlignment(.center).lineLimit(2)
+            HStack(spacing: 6) {
+                SourceBadge(source: tune.source)
+                Text(tune.displayArtist).font(.title3).foregroundStyle(CratesColor.textSecondary)
             }
-            .padding(.horizontal)
+            metaLine(tune)
+        }
+    }
+
+    /// Third line of the title block: the playback error takes the genre line's slot, so an
+    /// error appearing never shifts the rest of the layout.
+    @ViewBuilder private func metaLine(_ tune: Tune) -> some View {
+        if let error = player.playbackError {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote).foregroundStyle(CratesColor.red)
+                .lineLimit(2).multilineTextAlignment(.center)
+        } else if !metaText(tune).isEmpty {
+            Text(metaText(tune))
+                .font(.footnote).foregroundStyle(CratesColor.textSecondary)
+        }
+    }
+
+    /// "Techno · 132 BPM · A♭m" with missing parts dropped — never a dangling separator.
+    private func metaText(_ tune: Tune) -> String {
+        [tune.genre, tune.bpm.map { "\($0) BPM" }, tune.key]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+    }
+
+    // MARK: - Expanded: compact header + queue
+
+    private func expandedLayout(_ tune: Tune) -> some View {
+        VStack(spacing: 0) {
+            compactHeader(tune)
+                .padding(.top, 24)
+                .padding(.horizontal, inset)
+
+            scrubber
+                .padding(.top, 16)
+                .padding(.horizontal, inset)
+
+            transport
+                .padding(.top, 8)
+                .padding(.horizontal, inset)
+
+            queueHandle
+                .padding(.top, 12)
+                .padding(.horizontal, inset)
+
+            queueList
         }
     }
 
     private func compactHeader(_ tune: Tune) -> some View {
         HStack(spacing: 12) {
-            Artwork(tune: tune, size: 56)
+            Artwork(tune: tune, size: 64)
                 .matchedGeometryEffect(id: "art", in: artNamespace)
             VStack(alignment: .leading, spacing: 2) {
                 Text(tune.displayTitle).font(.headline).lineLimit(1)
@@ -88,24 +155,53 @@ struct NowPlayingView: View {
                     Text(tune.displayArtist).font(.subheadline)
                         .foregroundStyle(CratesColor.textSecondary).lineLimit(1)
                 }
+                if let error = player.playbackError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(CratesColor.red)
+                        .lineLimit(2) // the error is the one line that must stay readable
+                } else if !metaText(tune).isEmpty {
+                    Text(metaText(tune))
+                        .font(.caption).foregroundStyle(CratesColor.textSecondary).lineLimit(1)
+                }
             }
             Spacer(minLength: 0)
         }
     }
 
-    // MARK: - Scrubber & transport
+    // MARK: - Scrubber & transport (shared, never move during the morph)
 
+    /// Thumbless Apple-Music-style progress bar: a capsule that thickens while dragging.
+    /// The stock Slider's oversized thumb overhung the track start and read template-y.
     private var scrubber: some View {
-        VStack(spacing: 4) {
-            Slider(value: Binding(
-                get: { isScrubbing ? scrubValue : player.currentTime },
-                set: { scrubValue = $0 }
-            ), in: 0...max(player.duration, 1)) { editing in
-                if editing { scrubValue = player.currentTime }
-                isScrubbing = editing
-                if !editing { player.seek(to: scrubValue) }
+        VStack(spacing: 6) {
+            GeometryReader { geo in
+                let duration = max(player.duration, 1)
+                let shown = isScrubbing ? scrubValue : player.currentTime
+                let fraction = min(1, max(0, shown / duration))
+                ZStack(alignment: .leading) {
+                    Capsule().fill(CratesColor.textSecondary.opacity(0.22))
+                    Capsule().fill(CratesColor.accent)
+                        .frame(width: max(geo.size.width * fraction, fraction > 0 ? 6 : 0))
+                }
+                .frame(height: isScrubbing ? 12 : 6)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .contentShape(.rect)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            isScrubbing = true
+                            let fraction = min(1, max(0, value.location.x / max(geo.size.width, 1)))
+                            scrubValue = fraction * duration
+                        }
+                        .onEnded { _ in
+                            player.seek(to: scrubValue)
+                            isScrubbing = false
+                        }
+                )
             }
-            .tint(CratesColor.accent)
+            .frame(height: 24) // full-height hit area around the thin bar
+            .animation(.snappy(duration: 0.2), value: isScrubbing)
+
             HStack {
                 Text(timeLabel(isScrubbing ? scrubValue : player.currentTime))
                 Spacer()
@@ -114,101 +210,138 @@ struct NowPlayingView: View {
             .font(.caption.monospacedDigit())
             .foregroundStyle(CratesColor.textSecondary)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Playback position")
+        .accessibilityValue(timeLabel(player.currentTime))
+        .accessibilityAdjustableAction { direction in
+            let delta: Double = direction == .increment ? 15 : -15
+            player.seek(to: min(max(0, player.currentTime + delta), player.duration))
+        }
     }
 
+    /// Five equal-width slots: the play button is structurally on the sheet's center axis
+    /// (Spacer-based centering only holds when flank glyph widths happen to match). One icon
+    /// treatment throughout — primary when off, accent when on — so shuffle/repeat don't read
+    /// as disabled next to the filled prev/next glyphs. Sizes identical in both detents so the
+    /// morph doesn't re-scale the controls.
     private var transport: some View {
-        HStack {
+        HStack(spacing: 0) {
             Button { player.isShuffled.toggle() } label: {
-                Image(systemName: "shuffle").font(.title3)
-                    .foregroundStyle(player.isShuffled ? CratesColor.accent : CratesColor.textSecondary)
+                Image(systemName: "shuffle").font(.title3.weight(.semibold))
+                    .foregroundStyle(player.isShuffled ? CratesColor.accent : .primary)
             }
-            Spacer()
+            .frame(maxWidth: .infinity)
             Button { player.previous() } label: { Image(systemName: "backward.fill").font(.title) }
-            Spacer()
+                .frame(maxWidth: .infinity)
             Button { player.togglePlayPause() } label: {
                 Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: queueExpanded ? 54 : 64))
+                    .font(.system(size: 62))
                     .foregroundStyle(CratesColor.accent)
                     .contentTransition(.symbolEffect(.replace))
             }
-            Spacer()
+            .frame(maxWidth: .infinity)
             Button { player.next() } label: { Image(systemName: "forward.fill").font(.title) }
-            Spacer()
+                .frame(maxWidth: .infinity)
             Button { cycleRepeat() } label: {
-                Image(systemName: player.repeatMode == .one ? "repeat.1" : "repeat").font(.title3)
-                    .foregroundStyle(player.repeatMode == .off ? CratesColor.textSecondary : CratesColor.accent)
+                Image(systemName: player.repeatMode == .one ? "repeat.1" : "repeat").font(.title3.weight(.semibold))
+                    .foregroundStyle(player.repeatMode == .off ? .primary : CratesColor.accent)
             }
+            .frame(maxWidth: .infinity)
         }
         .foregroundStyle(.primary)
         .tint(CratesColor.accent)
-        .padding(.horizontal, 8)
     }
 
-    // MARK: - Up Next (in-place, handle-driven)
+    // MARK: - Up Next handle (the one glass element on this screen)
 
-    /// The handlebar: swipe up to unfold the queue, swipe down (or tap) to toggle. Everything
-    /// happens in this screen — no sheets, no disclosure chevrons.
+    /// A single centered pill on the transport's center axis — nothing else shares its row, so
+    /// a near-miss can't hit a different control (Edit lives in the queue's section header).
+    /// Tap toggles; the system sheet drag between detents is the swipe gesture (a custom
+    /// DragGesture would fight it).
     private var queueHandle: some View {
-        VStack(spacing: 6) {
-            Capsule().fill(CratesColor.textSecondary.opacity(0.35))
-                .frame(width: 44, height: 5)
-            HStack(spacing: 6) {
-                Text("Up Next").font(.headline)
-                if !upNextEntries.isEmpty {
-                    Text("\(upNextEntries.count)")
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(CratesColor.textSecondary)
-                }
-                Spacer()
-                if queueExpanded && !upNextEntries.isEmpty {
-                    Button(editMode == .active ? "Done" : "Edit") {
-                        withAnimation { editMode = editMode == .active ? .inactive : .active }
-                    }
-                    .font(.subheadline)
-                    .tint(CratesColor.accent)
-                }
+        HStack(spacing: 8) {
+            Image(systemName: "chevron.compact.up")
+                .font(.body.weight(.semibold))
+                .rotationEffect(.degrees(queueExpanded ? 180 : 0))
+            Text("Up Next").font(.subheadline.weight(.semibold))
+            if !upNextEntries.isEmpty {
+                Text("\(upNextEntries.count)")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(CratesColor.textSecondary)
             }
         }
+        .padding(.horizontal, 20)
         .padding(.vertical, 10)
+        .glassEffect(.regular.interactive(), in: .capsule)
+        .frame(maxWidth: .infinity, minHeight: 44)
         .contentShape(.rect)
-        .onTapGesture { toggleQueue() }
-        .gesture(
-            DragGesture(minimumDistance: 10)
-                .onEnded { value in
-                    if value.translation.height < -25 { setQueue(expanded: true) }
-                    else if value.translation.height > 25 { setQueue(expanded: false) }
-                }
-        )
+        .onTapGesture { setQueue(expanded: !queueExpanded) }
+        .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(queueExpanded ? "Collapse queue" : "Expand queue")
+        .accessibilityLabel(queueExpanded
+            ? "Collapse queue"
+            : "Expand queue, \(upNextEntries.count) tracks up next")
         .accessibilityIdentifier("queueHandle")
+        .accessibilityAdjustableAction { direction in
+            setQueue(expanded: direction == .increment)
+        }
     }
 
     private var queueList: some View {
         List {
             if !manualBlock.isEmpty {
-                Section("Added to Queue") {
-                    queueRows(manualBlock, baseIndex: upNextStart)
+                Section {
+                    queueRows(manualBlock, baseIndex: upNextStart, isLastSection: contextBlock.isEmpty)
+                } header: {
+                    sectionHeader("Added to Queue", showsEdit: true)
                 }
+                .listSectionMargins(.top, 0)
             }
             if !contextBlock.isEmpty {
-                Section(manualBlock.isEmpty && player.contextName == nil ? "" : contextHeader) {
-                    queueRows(contextBlock, baseIndex: upNextStart + manualBlock.count)
+                Section {
+                    queueRows(contextBlock, baseIndex: upNextStart + manualBlock.count, isLastSection: true)
+                } header: {
+                    sectionHeader(contextHeader, showsEdit: manualBlock.isEmpty)
                 }
+                .listSectionMargins(.top, manualBlock.isEmpty ? 0 : 8)
             }
             if upNextEntries.isEmpty {
                 Text("Nothing up next — swipe right on any track to queue it.")
                     .font(.footnote).foregroundStyle(CratesColor.textSecondary)
                     .listRowBackground(Color.clear)
+                    .listRowInsets(.init(top: 12, leading: inset, bottom: 12, trailing: inset))
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .listSectionSpacing(8)
+        .environment(\.defaultMinListHeaderHeight, 1)
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .environment(\.editMode, $editMode)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
-    private func queueRows(_ block: [QueueEntry], baseIndex: Int) -> some View {
+    /// Section header row: title leading, Edit/Done trailing (classic iOS grammar — the Edit
+    /// control lives with the list it edits, not inside the drag pill's tap area).
+    private func sectionHeader(_ title: String, showsEdit: Bool = false) -> some View {
+        HStack {
+            Text(title)
+                .font(.footnote.smallCaps().weight(.semibold))
+                .foregroundStyle(CratesColor.textSecondary)
+            Spacer()
+            if showsEdit {
+                Button(editMode == .active ? "Done" : "Edit") {
+                    withAnimation { editMode = editMode == .active ? .inactive : .active }
+                }
+                .font(.footnote.weight(.semibold))
+                .tint(CratesColor.accent)
+            }
+        }
+        .textCase(nil)
+        .listRowInsets(.init(top: 0, leading: inset, bottom: 4, trailing: inset))
+    }
+
+    private func queueRows(_ block: [QueueEntry], baseIndex: Int, isLastSection: Bool) -> some View {
         ForEach(block) { entry in
             QueueRow(tune: entry.tune)
                 .contentShape(.rect)
@@ -217,7 +350,11 @@ struct NowPlayingView: View {
                         player.jump(to: i)
                     }
                 }
-                .listRowInsets(.init(top: 8, leading: 4, bottom: 8, trailing: 4))
+                .listRowInsets(.init(top: 8, leading: inset, bottom: 8, trailing: inset))
+                .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
+                .listRowSeparator(
+                    isLastSection && entry.id == block.last?.id ? .hidden : .automatic,
+                    edges: .bottom) // no dangling separator under the final row
         }
         .onDelete { offsets in
             player.removeFromQueue(at: IndexSet(offsets.map { $0 + baseIndex }))
@@ -231,8 +368,6 @@ struct NowPlayingView: View {
     private var contextHeader: String {
         player.contextName.map { "From \($0)" } ?? "Up Next"
     }
-
-    private func toggleQueue() { setQueue(expanded: !queueExpanded) }
 
     private func setQueue(expanded: Bool) {
         withAnimation(.snappy(duration: 0.35)) {

@@ -14,6 +14,10 @@ struct QueueRow: View {
                     SourceBadge(source: tune.source)
                     Text(tune.displayArtist).font(.subheadline)
                         .foregroundStyle(CratesColor.textSecondary).lineLimit(1)
+                    if let bpm = tune.bpm, bpm != "—" {
+                        Text("· \(bpm) BPM").font(.subheadline)
+                            .foregroundStyle(CratesColor.textSecondary)
+                    }
                 }
             }
             Spacer()
