@@ -6,6 +6,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(PlaybackController.self) private var player
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showNowPlaying = false
     @State private var selection: AppTab = .home
 
@@ -24,6 +25,10 @@ struct RootView: View {
             }
             .sheet(isPresented: $showNowPlaying) {
                 NowPlayingView()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // Foreground = freshness moment; runDeltaSync self-debounces (90s).
+                if phase == .active { Task { await model.runDeltaSync() } }
             }
     }
 

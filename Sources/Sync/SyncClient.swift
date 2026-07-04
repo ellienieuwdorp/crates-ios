@@ -18,22 +18,18 @@ actor SyncClient {
         self.session = session
     }
 
-    /// Server format for the incremental cursor.
-    static let syncDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
-
-    /// Download the backup zip to a temp file and return its URL. Reports coarse progress via the
-    /// optional handler (0…1, or nil when the server doesn't send a content length).
+    /// Download the backup zip to a temp file and return its URL.
+    ///
+    /// `sinceCursor` is an OPAQUE string in the server's own time frame ("yyyy-MM-dd HH:mm:ss",
+    /// server-local wall clock) — always the lexicographic-max stamp from a previous payload,
+    /// never a device-clock Date (device TZ ≠ server TZ corrupts the cursor silently). An
+    /// invalid cursor gets HTTP 400 with a JSON body: surfaced as CratesAPIError.http(400),
+    /// caller falls back to a full sync.
     func downloadBackup(includeImages: Bool = false,
-                        since lastSync: Date? = nil) async throws -> URL {
+                        sinceCursor: String? = nil) async throws -> URL {
         var query = [URLQueryItem(name: "includeImageFiles", value: includeImages ? "true" : "false")]
-        if let lastSync {
-            query.append(URLQueryItem(name: "lastSyncDate",
-                                      value: Self.syncDateFormatter.string(from: lastSync)))
+        if let sinceCursor {
+            query.append(URLQueryItem(name: "lastSyncDate", value: sinceCursor))
         }
         guard let url = connection.url(path: "sync/export.backup", query: query) else {
             throw CratesAPIError.badURL

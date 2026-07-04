@@ -29,6 +29,13 @@ final class AppModel {
 
     private static let connKey = "crates.connection"
     private static let lastSyncKey = "crates.lastSyncDate"
+    /// Opaque server-frame delta cursor (max stamp string from the last payload) — see SyncClient.
+    /// nonisolated: written from a detached persistence task.
+    private nonisolated static let cursorKey = "crates.syncCursor"
+
+    /// Debounce for foreground-triggered delta syncs (a "delta" still moves ~350 KB because
+    /// most tables always ship full).
+    private var lastDeltaAttempt: Date? = nil
 
     /// Guards against concurrent/duplicate initial syncs — two overlapping imports race on temp
     /// files and corrupt the parse, then persist garbage over the good cache.
@@ -65,6 +72,8 @@ final class AppModel {
             library.markSnapshotBacked()
             if library.rootCrates.isEmpty {
                 try? await runInitialSync()   // first launch after pairing, or cache was cleared
+            } else {
+                await runDeltaSync()          // background freshness on every launch
             }
         } else {
             enterDemoMode()
@@ -102,25 +111,85 @@ final class AppModel {
     }
 
     /// Download + import the full library backup into the store. Single-flight: a concurrent call
-    /// is a no-op (the in-flight sync is authoritative).
-    func runInitialSync() async throws {
+    /// is a no-op (the in-flight sync is authoritative). `quiet` suppresses onboarding UI when
+    /// the full sync is a background reseed (migration / invalid cursor), not user onboarding.
+    func runInitialSync(quiet: Bool = false) async throws {
         guard !isSyncing else { return }
         isSyncing = true
         defer { isSyncing = false }
 
-        onboarding = .syncing("Downloading library…", 0.05)
+        if !quiet { onboarding = .syncing("Downloading library…", 0.05) }
         let sync = SyncClient(connection: connection)
-        let zipURL = try await sync.downloadBackup(includeImages: false, since: nil)
+        let zipURL = try await sync.downloadBackup(includeImages: false, sinceCursor: nil)
 
-        onboarding = .syncing("Importing…", 0.5)
-        let snapshot = try await Task.detached(priority: .userInitiated) {
-            try BackupImporter.importBackup(zipURL: zipURL)
+        if !quiet { onboarding = .syncing("Importing…", 0.5) }
+        let result = try await Task.detached(priority: .userInitiated) {
+            try BackupImporter.importBackup(zipURL: zipURL, mode: .full, cachedTunes: [:], cachedAudio: [:])
         }.value
         try? FileManager.default.removeItem(at: zipURL)
 
-        library.loadSnapshot(snapshot)
+        library.loadSnapshot(result.snapshot)
+        persistSyncArtifacts(result)
         UserDefaults.standard.set(Date(), forKey: AppModel.lastSyncKey)
-        onboarding = .syncing("Done — \(snapshot.tuneCount) tunes", 1.0)
+        if !quiet { onboarding = .syncing("Done — \(result.snapshot.tuneCount) tunes", 1.0) }
+    }
+
+    /// Incremental sync: fetch the delta since the stored cursor, merge into the raw caches,
+    /// rebuild the snapshot. Background-only — never touches onboarding UI; failures leave the
+    /// cached library on screen. Falls back to a quiet full sync when there is no cursor/raw
+    /// cache yet (pre-delta installs) or the server rejects the cursor (HTTP 400).
+    func runDeltaSync(force: Bool = false) async {
+        guard isPaired, !isDemo, !isSyncing else { return }
+        if !force, let last = lastDeltaAttempt, Date().timeIntervalSince(last) < 90 { return }
+
+        let cursor = UserDefaults.standard.string(forKey: AppModel.cursorKey)
+        let cachedTunes = await DiskCache.shared.load("raw_tunes", as: [Int64: Backup.TuneRow].self)
+        let cachedAudio = await DiskCache.shared.load("raw_audio", as: [Int64: Backup.AudioFileRow].self)
+        guard let cursor, let cachedTunes, let cachedAudio else {
+            try? await runInitialSync(quiet: true) // seed cursor + raw caches
+            lastDeltaAttempt = Date()
+            return
+        }
+
+        guard !isSyncing else { return } // re-check: the cache loads above suspended
+        isSyncing = true
+        defer { isSyncing = false }
+        lastDeltaAttempt = Date()
+
+        do {
+            let zipURL = try await SyncClient(connection: connection).downloadBackup(sinceCursor: cursor)
+            let result = try await Task.detached(priority: .utility) {
+                try BackupImporter.importBackup(zipURL: zipURL, mode: .delta,
+                                                cachedTunes: cachedTunes, cachedAudio: cachedAudio)
+            }.value
+            try? FileManager.default.removeItem(at: zipURL)
+
+            library.loadSnapshot(result.snapshot)
+            persistSyncArtifacts(result, previousCursor: cursor)
+            UserDefaults.standard.set(Date(), forKey: AppModel.lastSyncKey)
+        } catch {
+            if case CratesAPIError.http(400) = error {
+                // Server rejected the cursor — drop it; the next attempt reseeds via full sync.
+                UserDefaults.standard.removeObject(forKey: AppModel.cursorKey)
+            }
+            // Otherwise silent: delta is background freshness, the cached library stays up.
+        }
+    }
+
+    /// Persist the raw caches, then the cursor — in that order. A failure between the two
+    /// leaves the old cursor, and the next delta simply re-fetches idempotently (upserts by PK,
+    /// inclusive >= filter re-delivers the boundary row anyway).
+    private func persistSyncArtifacts(_ result: BackupImporter.MergeResult, previousCursor: String? = nil) {
+        let raws = (tunes: result.rawTunes, audio: result.rawAudio)
+        // Monotonic: an empty delta has no stamps — keep the old cursor.
+        let cursor = [previousCursor, result.newCursor].compactMap { $0 }.max()
+        Task.detached {
+            await DiskCache.shared.save(raws.tunes, key: "raw_tunes")
+            await DiskCache.shared.save(raws.audio, key: "raw_audio")
+            if let cursor {
+                UserDefaults.standard.set(cursor, forKey: AppModel.cursorKey)
+            }
+        }
     }
 
     func dismissOnboarding() { onboarding = .idle }
@@ -129,6 +198,7 @@ final class AppModel {
         player.stop()
         connection = CratesConnection(host: "", port: CratesConnection.defaultPort, token: "")
         UserDefaults.standard.removeObject(forKey: AppModel.connKey)
+        UserDefaults.standard.removeObject(forKey: AppModel.cursorKey) // next pairing starts with a full sync
         Task { await client.update(connection: connection) }
         wire() // player/downloads must drop the stale host + bearer token immediately
     }

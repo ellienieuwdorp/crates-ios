@@ -8,19 +8,79 @@ import ZIPFoundation
 ///   Tunes ⨝ AudioFiles(bpm/key/codec) ⨝ Ratings → enriched Tune
 ///   Crates + CrateToCrates(hierarchy) → crate tree
 ///   CrateToTunes(ordering, per-crate date) → ordered tunes per crate
+///
+/// Delta semantics (verified against the LIVE server, dogfood round 3 W8): `lastSyncDate`
+/// filters ONLY Tunes/AudioFiles/Covers (inclusive >=, empty arrays when unchanged); every
+/// other table ships FULL on every request, and there are no tombstones — so the merge upserts
+/// the filtered tables into raw caches by PK, treats the full tables as replacements, and GCs
+/// tunes that vanished from the always-full CrateToTunes.
 enum BackupImporter {
     struct Progress: Sendable { var stage: String; var fraction: Double }
 
+    enum SyncMode: Sendable { case full, delta }
+
+    /// Everything a sync produces: the browsable snapshot plus the raw caches and cursor the
+    /// NEXT delta needs.
+    struct MergeResult: Sendable {
+        var snapshot: LibrarySnapshot
+        var rawTunes: [Int64: Backup.TuneRow]
+        var rawAudio: [Int64: Backup.AudioFileRow]
+        /// Lexicographic max of every DateLastModified/DateModified stamp seen in the payload's
+        /// filtered tables — the server's own clock, never the device's. Nil if none appeared.
+        var newCursor: String?
+    }
+
+    /// The decoded backup tables. Internal so merge logic is unit-testable without zips.
+    struct Tables: Sendable {
+        var tunes: [Backup.TuneRow] = []
+        var crates: [Backup.CrateRow] = []
+        var hierarchy: [Backup.CrateToCrateRow] = []
+        var membership: [Backup.CrateToTuneRow] = []
+        var audio: [Backup.AudioFileRow] = []
+        var ratings: [Backup.RatingRow] = []
+        var covers: [Backup.CoverRow] = []
+    }
+
+    /// Compatibility entry point: full import, raw caches discarded (existing tests + callers
+    /// that only want the snapshot).
     static func importBackup(zipURL: URL,
                              progress: @Sendable (Progress) -> Void = { _ in }) throws -> LibrarySnapshot {
+        try importBackup(zipURL: zipURL, mode: .full, cachedTunes: [:], cachedAudio: [:], progress: progress).snapshot
+    }
+
+    static func importBackup(zipURL: URL,
+                             mode: SyncMode,
+                             cachedTunes: [Int64: Backup.TuneRow],
+                             cachedAudio: [Int64: Backup.AudioFileRow],
+                             progress: @Sendable (Progress) -> Void = { _ in }) throws -> MergeResult {
+        progress(.init(stage: "Unpacking", fraction: 0.1))
+        let tables = try decodeTables(zipURL: zipURL)
+
+        progress(.init(stage: "Building library", fraction: 0.6))
+        let merged = merge(mode: mode, incoming: tables, cachedTunes: cachedTunes, cachedAudio: cachedAudio)
+        let snapshot = buildSnapshot(tunes: Array(merged.tunes.values),
+                                     crates: tables.crates,
+                                     hierarchy: tables.hierarchy,
+                                     membership: tables.membership,
+                                     audio: Array(merged.audio.values),
+                                     ratings: tables.ratings)
+
+        progress(.init(stage: "Done", fraction: 1.0))
+        return MergeResult(snapshot: snapshot,
+                           rawTunes: merged.tunes,
+                           rawAudio: merged.audio,
+                           newCursor: merged.cursor)
+    }
+
+    // MARK: - Decode
+
+    static func decodeTables(zipURL: URL) throws -> Tables {
         let fm = FileManager.default
         // Unique per call so overlapping imports can never read each other's half-written files.
         let dir = fm.temporaryDirectory.appendingPathComponent("crates-backup-\(UUID().uuidString)")
         try? fm.removeItem(at: dir)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: dir) }
-
-        progress(.init(stage: "Unpacking", fraction: 0.1))
         try fm.unzipItem(at: zipURL, to: dir)
 
         // Resilient per-row decode: the server's JSON is loosely typed (numbers as strings, fields
@@ -35,16 +95,58 @@ enum BackupImporter {
             return wrapped.compactMap(\.value)
         }
 
-        progress(.init(stage: "Reading library", fraction: 0.35))
-        let tuneRows = rows("Tunes.json", Backup.TuneRow.self)
-        let crateRows = rows("Crates.json", Backup.CrateRow.self)
-        let hierarchy = rows("CrateToCrates.json", Backup.CrateToCrateRow.self)
-        let membership = rows("CrateToTunes.json", Backup.CrateToTuneRow.self)
-        let audioFiles = rows("AudioFiles.json", Backup.AudioFileRow.self)
-        let ratings = rows("Ratings.json", Backup.RatingRow.self)
+        return Tables(
+            tunes: rows("Tunes.json", Backup.TuneRow.self),
+            crates: rows("Crates.json", Backup.CrateRow.self),
+            hierarchy: rows("CrateToCrates.json", Backup.CrateToCrateRow.self),
+            membership: rows("CrateToTunes.json", Backup.CrateToTuneRow.self),
+            audio: rows("AudioFiles.json", Backup.AudioFileRow.self),
+            ratings: rows("Ratings.json", Backup.RatingRow.self),
+            covers: rows("Covers.json", Backup.CoverRow.self)
+        )
+    }
 
-        progress(.init(stage: "Building library", fraction: 0.6))
+    // MARK: - Merge (unit-tested without zips)
 
+    /// Upsert the delta-filtered tables into the raw caches by PK, GC tunes that vanished from
+    /// the always-full CrateToTunes, and compute the next cursor from the payload's own stamps.
+    static func merge(mode: SyncMode,
+                      incoming: Tables,
+                      cachedTunes: [Int64: Backup.TuneRow],
+                      cachedAudio: [Int64: Backup.AudioFileRow])
+        -> (tunes: [Int64: Backup.TuneRow], audio: [Int64: Backup.AudioFileRow], cursor: String?) {
+        var tunes = (mode == .full) ? [:] : cachedTunes
+        var audio = (mode == .full) ? [:] : cachedAudio
+        for r in incoming.tunes { tunes[r.TuneID] = r }                       // idempotent upsert
+        for r in incoming.audio { if let id = r.AudioFileID { audio[id] = r } else if let t = r.TuneID { audio[-t] = r } }
+
+        if mode == .delta {
+            // Deletions have no tombstones; a tune that left the library disappears from the
+            // always-full CrateToTunes. Guard: an empty/corrupt membership table must never
+            // wipe the cache.
+            let live = Set(incoming.membership.map(\.TuneID))
+            if !live.isEmpty {
+                tunes = tunes.filter { live.contains($0.key) }
+                audio = audio.filter { row in row.value.TuneID.map(live.contains) ?? true }
+            }
+        }
+
+        // Cursor: server-frame stamps only (device clock and TZ are unusable — stamps are
+        // server-local wall time). Lexicographic max works because the format is sortable.
+        let stamps = incoming.tunes.compactMap(\.DateLastModified)
+            + incoming.audio.compactMap(\.DateModified)
+            + incoming.covers.compactMap(\.DateModified)
+        return (tunes, audio, stamps.max())
+    }
+
+    // MARK: - Join
+
+    static func buildSnapshot(tunes tuneRows: [Backup.TuneRow],
+                              crates crateRows: [Backup.CrateRow],
+                              hierarchy: [Backup.CrateToCrateRow],
+                              membership: [Backup.CrateToTuneRow],
+                              audio audioFiles: [Backup.AudioFileRow],
+                              ratings: [Backup.RatingRow]) -> LibrarySnapshot {
         // Side tables keyed by tune.
         let audioByTune = Dictionary(audioFiles.compactMap { r in r.TuneID.map { ($0, r) } },
                                      uniquingKeysWith: { a, _ in a })
@@ -122,7 +224,6 @@ enum BackupImporter {
             .filter { !hasParent.contains($0.id) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
-        progress(.init(stage: "Done", fraction: 1.0))
         return LibrarySnapshot(
             rootCrates: rootCrates,
             childrenByCrate: childrenByCrate,

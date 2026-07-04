@@ -6,7 +6,10 @@ import Foundation
 ///
 /// Only the columns we use are declared; the decoder ignores the rest.
 enum Backup {
-    struct TuneRow: Decodable {
+    // TuneRow/AudioFileRow are Codable (not just Decodable): delta sync persists them as raw
+    // caches (DiskCache "raw_tunes"/"raw_audio") and upserts delta rows into them by PK —
+    // lastSyncDate only filters these tables server-side (verified live, dogfood round 3 W8).
+    struct TuneRow: Codable {
         let TuneID: Int64
         let TuneTitle: String?
         let TuneName: String?
@@ -15,7 +18,7 @@ enum Backup {
         let Genre: String?
         let TuneLength: String?          // seconds, but the server sends it as a STRING ("431")
         let DateAdded: String?
-        let DateLastModified: String?
+        let DateLastModified: String?    // the server's delta filter column for this table
         let CoverID: Int64?
         let PlayedCount: Int?
         let DefaultAudioSourceType: Int? // 1 = local file, 5 = bandcamp (from /audiosource/types)
@@ -45,18 +48,27 @@ enum Backup {
         let PrimaryCrate: Bool?
     }
 
-    struct AudioFileRow: Decodable {
+    struct AudioFileRow: Codable {
+        let AudioFileID: Int64?     // PK for delta upserts
         let TuneID: Int64?
         let Bpm: String?
         let Key: String?
         let Codec: String?
         let FileType: String?
         let StorageType: String?    // LOCAL_STORAGE etc.
+        let DateModified: String?   // the server's delta filter column for this table
     }
 
     struct RatingRow: Decodable {
         let ObjectID: Int64?
         let RatingValue: Int?
+    }
+
+    /// Only for the delta cursor (and future artwork-cache eviction) — Covers is the third
+    /// lastSyncDate-filtered table.
+    struct CoverRow: Decodable {
+        let CoverID: Int64?
+        let DateModified: String?
     }
 
     /// The audio-source type ids seen in real data. Full set is resolvable at runtime from
