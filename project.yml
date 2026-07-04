@@ -15,9 +15,13 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.2.0"
     CURRENT_PROJECT_VERSION: "1"
-    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # Off so the build-stamp script can edit the built product's Info.plist. Every build gets a
+    # unique CFBundleVersion (date/time) — with a static version+build the device install
+    # service kept the previously installed binary, so the phone was stuck on old builds while
+    # the simulator (which always replaces) got new ones.
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
     GENERATE_INFOPLIST_FILE: YES
     # Automatic signing with Ellie's team so builds work on device + simulator.
     CODE_SIGN_STYLE: Automatic
@@ -51,6 +55,15 @@ targets:
           - _http._tcp
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+    postBuildScripts:
+      - name: Stamp build number
+        basedOnDependencyAnalysis: false
+        script: |
+          # Unique CFBundleVersion per build so device installs always replace the old binary.
+          INFOPLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          if [ -f "$INFOPLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(date +%Y%m%d.%H%M%S)" "$INFOPLIST"
+          fi
 
   CratesTests:
     type: bundle.unit-test

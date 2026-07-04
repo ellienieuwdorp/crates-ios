@@ -38,6 +38,9 @@ struct SettingsView: View {
                 LabeledContent("Auth", value: "Bearer token via pairing")
                 LabeledContent("Sync", value: "Bulk backup + delta")
                 LabeledContent("Transport", value: "HTTP · local network")
+                // Build is stamped with the build date/time, so this line answers "which
+                // version is actually on the phone" at a glance.
+                LabeledContent("Version", value: appVersion)
             }
         }
         .navigationTitle("Connection")
@@ -45,6 +48,12 @@ struct SettingsView: View {
         .onChange(of: model.onboarding) { _, new in
             if new == .done { dismiss() }
         }
+    }
+
+    private var appVersion: String {
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "\(short) (\(build))"
     }
 
     @ViewBuilder private var pairRow: some View {
