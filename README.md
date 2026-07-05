@@ -14,8 +14,10 @@ offline-capable, iOS-native listening companion.
 | [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md) | Core direction, time-agnostic. Read first. |
 | [`docs/ideas/feature-ideas.md`](docs/ideas/feature-ideas.md) | The founding feature ideas, in full. |
 | [`docs/api/capabilities-and-hurdles.md`](docs/api/capabilities-and-hurdles.md) | What the Crates API enables/blocks for this app. |
-| [`docs/research/stack-and-libraries.md`](docs/research/stack-and-libraries.md) | Stack decision + library research. |
-| [`docs/TODO.md`](docs/TODO.md) | Roadmap, categorized. |
+| [`docs/research/stack-decision.md`](docs/research/stack-decision.md) | Stack decision + library research. |
+| [`docs/research/reports/`](docs/research/reports/) | Deep-dive research reports (Liquid Glass, audio, persistence, product context, online-source preview feasibility). |
+| [`docs/design/`](docs/design/) | Dogfood-round design records — complaint → research → fix → on-device verification (`now-playing-redesign.md`, `dogfood-round-3.md`, `dogfood-round-4.md`). |
+| [`docs/TODO.md`](docs/TODO.md) | Roadmap, categorized, with per-item status. |
 
 ## Server context
 
