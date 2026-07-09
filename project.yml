@@ -53,8 +53,19 @@ targets:
         NSLocalNetworkUsageDescription: "Crates needs to find and connect to your Crates server on your local network."
         NSBonjourServices:
           - _http._tcp
+        # The Crates server is HTTP-only. NSAllowsLocalNetworking exempts cleartext to hosts iOS
+        # treats as "local" (RFC1918 IPs, *.local). But the server is often reached over Tailscale:
+        # a 100.64.0.0/10 CGNAT IP or a *.ts.net MagicDNS name — NEITHER counts as local, so ATS
+        # blocks it. Tailscale tunnels are WireGuard-encrypted end to end, so we allow cleartext to
+        # arbitrary hosts (personal, non-App-Store build against a user-supplied server). ts.net is
+        # also called out explicitly so MagicDNS keeps working even if arbitrary loads is tightened.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: true
+          NSExceptionDomains:
+            ts.net:
+              NSIncludesSubdomains: true
+              NSExceptionAllowsInsecureHTTPLoads: true
     postBuildScripts:
       - name: Stamp build number
         basedOnDependencyAnalysis: false

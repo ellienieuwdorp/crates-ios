@@ -13,7 +13,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Crates Server") {
+            Section {
                 if model.isPaired {
                     LabeledContent("Connected to", value: model.connection.host)
                     Button("Re-sync Library") { Task { try? await model.runInitialSync() } }
@@ -21,15 +21,21 @@ struct SettingsView: View {
                     Button("Cache All Artwork") { model.warmAllArtwork() }
                     Button("Sign Out", role: .destructive) { model.signOut(); dismiss() }
                 } else {
-                    TextField("Server IP (e.g. 192.168.1.42)", text: $host)
-                        // Not .decimalPad: comma-decimal locales get no "." key on it.
+                    TextField("Server address (IP or Tailscale name)", text: $host)
+                        // Not .decimalPad: hostnames need letters, and comma-decimal locales get
+                        // no "." key on it. numbersAndPunctuation covers IPs and *.ts.net names.
                         .keyboardType(.numbersAndPunctuation)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                     TextField("Port", text: $port).keyboardType(.numberPad)
                     pairRow
                 }
+            } header: {
+                Text("Crates Server")
+            } footer: {
+                connectionFooter
             }
+            .animation(.snappy, value: model.onboarding)
 
             Section("Appearance") {
                 Picker("Theme", selection: $appearance) {
@@ -84,14 +90,29 @@ struct SettingsView: View {
                 ProgressView(value: fraction) { Text(stage).font(.subheadline) }
                     .tint(CratesColor.accent)
             }
-        case .failed(let msg):
-            VStack(alignment: .leading, spacing: 6) {
-                pairButton
-                Label(msg, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(CratesColor.red)
-            }
         default:
+            // .failed also lands here: the button stays put and the error renders in the section
+            // footer (connectionFooter), so the row never grows or jumps.
             pairButton
+        }
+    }
+
+    /// Section footer: a neutral hint normally, a coherent inline warning when pairing failed.
+    /// Living in the footer (not the button's cell) keeps the control boundary stable and reads
+    /// as a natural part of the form rather than a control that suddenly sprouted an error.
+    @ViewBuilder private var connectionFooter: some View {
+        if model.isPaired {
+            EmptyView()
+        } else if case .failed(let msg) = model.onboarding {
+            Label {
+                Text(msg)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+            }
+            .font(.footnote)
+            .foregroundStyle(CratesColor.red)
+        } else {
+            Text("Enter your server's LAN IP or Tailscale address, then approve the pairing prompt in the Crates desktop app.")
         }
     }
 

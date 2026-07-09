@@ -14,7 +14,7 @@ struct CratesConnection: Sendable, Equatable, Codable {
 
     var baseURL: URL? {
         var comps = URLComponents()
-        comps.scheme = "http" // LAN plain-HTTP; ATS NSAllowsLocalNetworking covers this.
+        comps.scheme = "http" // Server is plain-HTTP (LAN or Tailscale); ATS is relaxed in Info.plist.
         comps.host = host
         comps.port = port
         comps.path = "/\(Self.apiRoot)"

@@ -18,8 +18,26 @@ enum CratesAPIError: Error, LocalizedError {
         case .pairingNotApproved: "Pairing was declined on the desktop."
         case .pairingTimeout: "Pairing timed out — approve the request on your computer."
         case .http(let code): "Server returned HTTP \(code)."
-        case .transport(let e): "Network error: \(e.localizedDescription)"
+        case .transport(let e): Self.friendlyTransport(e)
         case .decoding(let e): "Could not read the server's response. \(e.localizedDescription)"
+        }
+    }
+
+    /// Turn a raw URLError into a short, actionable line for the pairing UI. Falls back to the
+    /// system description for anything we don't specifically recognise.
+    private static func friendlyTransport(_ error: Error) -> String {
+        guard let url = error as? URLError else { return "Network error: \(error.localizedDescription)" }
+        switch url.code {
+        case .appTransportSecurityRequiresSecureConnection:
+            return "This server uses plain HTTP, which iOS blocks by default. If you just updated the app, reinstall it so the new network settings take effect."
+        case .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed:
+            return "Couldn't reach a Crates server at that address. Check the IP or Tailscale name and that the server is running."
+        case .timedOut:
+            return "The server didn't respond in time. Make sure it's reachable from your phone (same network or Tailscale connected)."
+        case .notConnectedToInternet, .networkConnectionLost:
+            return "The network connection dropped. Reconnect and try again."
+        default:
+            return "Network error: \(url.localizedDescription)"
         }
     }
 }
