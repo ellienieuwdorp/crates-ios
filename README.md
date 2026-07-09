@@ -1,8 +1,9 @@
 # Crates iOS
 
 Native iOS proof-of-concept client for the [Crates](https://crates.co) music server. The phone
-connects to a Crates server running on a computer on the same network and becomes an instant,
-offline-capable, iOS-native listening companion.
+connects to a Crates server running on a computer it can reach — same LAN or a Tailscale
+tailnet from anywhere — and becomes an instant, offline-capable, iOS-native listening
+companion. Your library in your pocket, not just in your house.
 
 **Start here → [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md)** — the alignment doc for anyone
 (human or agent) working on this project.
@@ -21,8 +22,11 @@ offline-capable, iOS-native listening companion.
 
 ## Server context
 
-- Crates desktop app exposes a REST API at `http://<lan-ip>:54735/resources`
+- Crates desktop app exposes a REST API at `http://<host>:54735/resources`
   (OpenAPI spec: `../api-specs/latest/openapi.yaml`, 1.15.3-beta.1, 447 paths).
+  `<host>` is a LAN IP or a Tailscale address (CGNAT 100.x IP / `*.ts.net` MagicDNS
+  name) — the server is plain HTTP either way; ATS is relaxed accordingly (personal
+  build; revisit before any App Store target).
 - Auth: `Authorization: Bearer <token>`, obtained through a pairing flow approved on the
   desktop. (The spec claims a `Client-ID` header — that's wrong; verified against the live
   server. Details in the API doc.)
