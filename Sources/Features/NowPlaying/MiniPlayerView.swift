@@ -14,6 +14,11 @@ struct MiniPlayerView: View {
     @Environment(PlaybackController.self) private var player
     var onExpand: () -> Void
 
+    /// Haptic triggers (counters, not player state: state also changes from the lock screen /
+    /// remote commands, and those must not buzz the phone — only direct touches do).
+    @State private var transportTaps = 0
+    @State private var swipeOpens = 0
+
     private let artSize: CGFloat = 30 // Music: ~30pt in the 48pt slot
 
     var body: some View {
@@ -45,6 +50,7 @@ struct MiniPlayerView: View {
                 }
                 Spacer(minLength: 8)
                 Button {
+                    transportTaps += 1
                     player.togglePlayPause()
                 } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
@@ -64,6 +70,7 @@ struct MiniPlayerView: View {
                 // identifier below propagates onto every child accessibility element.
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
                 Button {
+                    transportTaps += 1
                     player.next()
                 } label: {
                     Image(systemName: "forward.fill")
@@ -84,6 +91,27 @@ struct MiniPlayerView: View {
         .frame(minHeight: 48)
         .contentShape(.rect)
         .onTapGesture(perform: onExpand)
+        // Swipe up = open the full player (same destination as tap; philosophy: gestures over
+        // buttons for frequent actions). Plain `.gesture` so the buttons' 44pt targets win a
+        // stationary touch untouched; `minimumDistance` keeps taps below the drag threshold.
+        // The direction guard (mostly-vertical, upward) leaves horizontal slop inert rather
+        // than misfiring the player open.
+        .gesture(swipeUpToExpand)
+        .sensoryFeedback(.impact, trigger: transportTaps)
+        .sensoryFeedback(.impact(weight: .light), trigger: swipeOpens)
         .accessibilityIdentifier("miniPlayer")
+    }
+
+    private var swipeUpToExpand: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onEnded { value in
+                let dy = value.translation.height
+                let dx = value.translation.width
+                // Upward, predominantly vertical; a fast flick counts via projected end.
+                guard abs(dy) > abs(dx),
+                      dy < -20 || value.predictedEndTranslation.height < -60 else { return }
+                swipeOpens += 1
+                onExpand()
+            }
     }
 }
