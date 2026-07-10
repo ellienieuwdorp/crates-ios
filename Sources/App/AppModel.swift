@@ -229,6 +229,7 @@ final class AppModel {
         connection = CratesConnection(host: "", port: CratesConnection.defaultPort, token: "")
         UserDefaults.standard.removeObject(forKey: AppModel.connKey)
         UserDefaults.standard.removeObject(forKey: AppModel.cursorKey) // next pairing starts with a full sync
+        KeychainStore.delete(account: KeychainStore.Account.accessToken) // the bearer token is the one secret
         Task { await ArtworkStore.shared.clear() } // the previous server's art goes with its token
         Task { await client.update(connection: connection) }
         wire() // player/downloads must drop the stale host + bearer token immediately
@@ -242,13 +243,39 @@ final class AppModel {
         player.persistenceMode = .demo // demo queues stay in the demo world
     }
 
-    // MARK: - Persistence (token → Keychain in a real build)
+    // MARK: - Persistence (host/port in UserDefaults, bearer token in the Keychain)
 
     private static func loadConnection() -> CratesConnection? {
-        guard let data = UserDefaults.standard.data(forKey: connKey) else { return nil }
-        return try? JSONDecoder().decode(CratesConnection.self, from: data)
+        guard let data = UserDefaults.standard.data(forKey: connKey),
+              var conn = try? JSONDecoder().decode(CratesConnection.self, from: data)
+        else { return nil }
+
+        if let token = KeychainStore.get(account: KeychainStore.Account.accessToken) {
+            conn.token = token
+        } else if !conn.token.isEmpty {
+            // One-time migration for installs paired before the token moved to the Keychain: the
+            // token still rides inside the UserDefaults blob. Copy it into the Keychain, then strip
+            // it from UserDefaults so the secret lives in exactly one, protected place. Only rewrite
+            // the blob once the Keychain write succeeds — a failure leaves the install paired via
+            // the legacy field and simply retries the migration next launch.
+            if KeychainStore.set(conn.token, account: KeychainStore.Account.accessToken) {
+                saveConnectionMetadata(conn)
+            }
+        }
+        return conn
     }
+
     private static func saveConnection(_ conn: CratesConnection) {
-        if let data = try? JSONEncoder().encode(conn) { UserDefaults.standard.set(data, forKey: connKey) }
+        KeychainStore.set(conn.token, account: KeychainStore.Account.accessToken)
+        saveConnectionMetadata(conn)
+    }
+
+    /// Persist only the non-secret connection fields (host/port) to UserDefaults, with the token
+    /// blanked — it lives in the Keychain. `loadConnection` decodes the empty token back and
+    /// overlays the real one from the Keychain.
+    private static func saveConnectionMetadata(_ conn: CratesConnection) {
+        var metadata = conn
+        metadata.token = ""
+        if let data = try? JSONEncoder().encode(metadata) { UserDefaults.standard.set(data, forKey: connKey) }
     }
 }
