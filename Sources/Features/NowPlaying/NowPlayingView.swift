@@ -15,6 +15,7 @@ import SwiftUI
 /// exactly one glass element (the handle pill) per HIG layering.
 struct NowPlayingView: View {
     @Environment(PlaybackController.self) private var player
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var queueExpanded = false
     @State private var editMode: EditMode = .inactive
     @State private var scrubValue: Double = 0
@@ -23,7 +24,71 @@ struct NowPlayingView: View {
     /// with a realistic value so the first frame doesn't flash a sliver-height sheet.
     @State private var collapsedHeight: CGFloat = 560
 
+    // MARK: Continuous morph driver (Ellie, 2026-07-10: queue faded on its own curve)
+    //
+    // The sheet's content height changes LIVE while a detent drag is in flight, but
+    // `queueExpanded` only flips when the drag settles — anything keyed to the boolean
+    // animates on its own discrete curve after the finger already moved. So the morph is
+    // driven by `morphProgress`, derived every frame from the measured sheet height; the
+    // boolean keeps settled-state semantics only (hit-testing, edit-mode exit, dismissal,
+    // detent measurement guard, the collapse chevron).
+
+    /// Live height of the sheet root — tracks the finger during a detent drag.
+    @State private var sheetHeight: CGFloat = 0
+    /// Live width — a change means rotation/resize, which invalidates the height anchors.
+    @State private var sheetWidth: CGFloat = 0
+    /// Constant offset between the root's measured height and the collapsed detent value
+    /// (sheet chrome / safe-area delta). Min-ratcheted at settled rests: a mid-drag hold can
+    /// only sit ABOVE the collapsed rest, so a too-large candidate is always rejected.
+    @State private var collapsedChrome: CGFloat?
+    /// Root height at the settled `.large` detent. Max-ratcheted at settled rests: a mid-drag
+    /// hold can only sit BELOW the large rest, so a too-small candidate is always rejected.
+    @State private var expandedSheetHeight: CGFloat?
+    /// Debounce for anchor capture — only a height that has been still for a beat is a
+    /// settled detent (drag and animation heights stream continuously, rests are silent).
+    @State private var anchorSettleTask: Task<Void, Never>?
+    /// A collapsed-content measurement that arrived mid-morph. `onGeometryChange` fires only
+    /// on CHANGE, so a rejected measurement would otherwise be lost forever and the detent
+    /// stuck on a stale height (hit at accessibility sizes, where the very first measurement
+    /// lands while the estimated progress is briefly non-zero). Applied at the next rest.
+    @State private var pendingCollapsedHeight: CGFloat?
+
+    // Haptic triggers (TODO §6 haptics pass — subtle, standard styles).
+    @State private var transportPulse = 0 // play/pause, next, previous → light impact
+    @State private var modePulse = 0      // shuffle, repeat — mode selection → selection tick
+    @State private var queuePulse = 0     // queue row jump / remove / reorder → light impact
+
     private let inset: CGFloat = 24
+
+    /// The settled `.large` sheet height is device/orientation-constant, but `@State` dies
+    /// with each presentation — cache it so a re-opened player's very first drag already has
+    /// the true morph span instead of the estimated one.
+    @MainActor private enum SheetAnchorCache {
+        static var expandedHeight: CGFloat?
+    }
+
+    /// 0 = settled collapsed, 1 = settled expanded, tracking the FINGER, not the detent.
+    /// Every cross-fade/opacity/shadow in the morph keys off this one value so the player
+    /// header and the queue fade as a single surface under the drag, both directions.
+    private var morphProgress: CGFloat {
+        let floor = collapsedHeight + (collapsedChrome ?? 0)
+        // 175: measured .large-vs-collapsed content span on iPhone 17 Pro — only the very
+        // first drag of a launch ever uses it; the first settle captures the true value
+        // (with animation, so even a seed miss glides instead of snapping).
+        let ceiling = expandedSheetHeight ?? SheetAnchorCache.expandedHeight ?? (floor + 175)
+        guard ceiling - floor > 1 else { return queueExpanded ? 1 : 0 }
+        return min(1, max(0, (sheetHeight - floor) / (ceiling - floor)))
+    }
+
+    /// Discrete layout swaps that can't interpolate (HStack↔VStack, artwork 264↔64, the
+    /// 8pt-grid padding steps) flip at the morph midpoint — with their own animation — so
+    /// they also happen under the finger, symmetrically in both directions.
+    private var layoutExpanded: Bool { morphProgress >= 0.5 }
+
+    /// Collapsed hero art: 264pt, scaled well down at accessibility type sizes so the
+    /// collapsed stack still fits on screen (TODO §6 residual — the text growth is what
+    /// earns the room; the sheet also caps its type at accessibility2, see body).
+    private var collapsedArtSize: CGFloat { dynamicTypeSize.isAccessibilitySize ? 112 : 264 }
 
     private var collapsedDetent: PresentationDetent { .height(collapsedHeight) }
     /// Derived, never stored: PresentationDetent identity is value-based, so the selection must
@@ -49,11 +114,60 @@ struct NowPlayingView: View {
                 ContentUnavailableView("Nothing playing", systemImage: "music.note")
             }
         }
+        // The collapsed player is a fixed vertical stack: past accessibility2 it cannot
+        // physically fit any screen (a content-hugging detent taller than `.large` clips
+        // the transport off screen). Capping here keeps every control reachable — the HIG's
+        // "adjust layout when text can't be accommodated" escape hatch.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .presentationDetents([collapsedDetent, .large], selection: detentSelection)
         .presentationDragIndicator(.visible)
         // Expanded: a hard downward fling settles at the collapsed detent instead of blowing
         // through it and dismissing the player. Collapsed: swipe-down still dismisses.
         .interactiveDismissDisabled(queueExpanded)
+        .sensoryFeedback(.impact(weight: .light), trigger: transportPulse)
+        .sensoryFeedback(.selection, trigger: modePulse)
+        .sensoryFeedback(.impact(weight: .light), trigger: queuePulse)
+    }
+
+    /// Feeds the morph driver from the sheet root's live size and captures the two height
+    /// anchors, but only once a height has been still for a beat (a settled detent) — see
+    /// the ratchet notes on the properties for why a mid-drag finger hold is harmless.
+    private func trackSheetSize(_ size: CGSize) {
+        if size.width != sheetWidth {
+            // Rotation/resize: both anchors describe the old geometry.
+            sheetWidth = size.width
+            collapsedChrome = nil
+            expandedSheetHeight = nil
+            SheetAnchorCache.expandedHeight = nil
+        }
+        sheetHeight = size.height
+        scheduleAnchorCapture()
+    }
+
+    /// Also called when `queueExpanded` settles: an overdrag past `.large` clamps the content
+    /// at its final size EARLY, so the settle itself produces no geometry callback — without
+    /// this the expanded anchor would never be captured on a from-collapsed overdrag.
+    private func scheduleAnchorCapture() {
+        anchorSettleTask?.cancel()
+        anchorSettleTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            // Corrections animate: if the pre-capture estimate was off, the fades glide to
+            // their true endpoint instead of snapping (matters on the first-ever drag).
+            if queueExpanded {
+                let anchored = max(expandedSheetHeight ?? 0, sheetHeight)
+                withAnimation(.snappy(duration: 0.35)) { expandedSheetHeight = anchored }
+                SheetAnchorCache.expandedHeight = anchored
+            } else if let pending = pendingCollapsedHeight {
+                // A parked mid-morph measurement outranks anchor capture: apply it, let the
+                // sheet resize to the true content, and anchor on the rest that follows.
+                pendingCollapsedHeight = nil
+                withAnimation(.snappy(duration: 0.3)) { collapsedHeight = pending }
+            } else if sheetHeight > 0 {
+                let chrome = min(collapsedChrome ?? .infinity, sheetHeight - collapsedHeight)
+                withAnimation(.snappy(duration: 0.35)) { collapsedChrome = chrome }
+            }
+        }
     }
 
     // MARK: - One layout for both detents
@@ -69,28 +183,40 @@ struct NowPlayingView: View {
             VStack(spacing: 0) {
                 VStack(spacing: 0) {
                     morphingHeader(tune)
-                        .padding(.top, queueExpanded ? 24 : 28)
+                        .padding(.top, layoutExpanded ? 24 : 28)
                     scrubber
-                        .padding(.top, queueExpanded ? 16 : 20)
+                        .padding(.top, layoutExpanded ? 16 : 20)
                     transport(scrollProxy: proxy)
-                        .padding(.top, queueExpanded ? 8 : 12)
+                        .padding(.top, layoutExpanded ? 8 : 12)
                     queueHandle
-                        .padding(.top, queueExpanded ? 12 : 16)
-                        .padding(.bottom, queueExpanded ? 0 : 4)
+                        .padding(.top, layoutExpanded ? 12 : 16)
+                        .padding(.bottom, layoutExpanded ? 0 : 4)
                 }
                 .padding(.horizontal, inset)
                 .frame(maxWidth: .infinity)
                 .fixedSize(horizontal: false, vertical: true) // hug intrinsic height for measurement
+                // Animates the mid-drag threshold flips (layout swap, art size, paddings);
+                // the continuous progress-driven fades never pass through here.
+                .animation(.snappy(duration: 0.35), value: layoutExpanded)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                    guard !queueExpanded else { return } // only the collapsed shape defines the detent
+                    // Only the settled collapsed SHAPE defines the detent: mid-morph the art/
+                    // paddings are in flight (threshold-keyed), and measuring them would feed
+                    // the detent back into the very drag that's moving it.
+                    guard !queueExpanded, !layoutExpanded else { return }
                     let measured = height.rounded(.up)
                     guard abs(measured - collapsedHeight) >= 1 else { return } // ignore float jitter
-                    // Animate so content growth (title wrap, error line) resizes the sheet
-                    // smoothly instead of snapping a frame later.
-                    withAnimation(.snappy(duration: 0.3)) { collapsedHeight = measured }
+                    if morphProgress < 0.02 {
+                        // Animate so content growth (title wrap, error line) resizes the sheet
+                        // smoothly instead of snapping a frame later.
+                        withAnimation(.snappy(duration: 0.3)) { collapsedHeight = measured }
+                    } else {
+                        // Mid-morph: park it — scheduleAnchorCapture applies it at rest.
+                        pendingCollapsedHeight = measured
+                    }
                 }
 
                 queueList
+                    .opacity(morphProgress) // fades in lockstep with the header cross-fade
                     .allowsHitTesting(queueExpanded) // clipped below the fold when collapsed
                     .overlay(alignment: .bottomTrailing) {
                         // One-handed collapse: the system already turns a list-top pull into a
@@ -112,28 +238,34 @@ struct NowPlayingView: View {
                     }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            // The morph driver: this root fills the sheet, so its size IS the sheet's live
+            // size — the system updates it every frame of a detent drag.
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { trackSheetSize($0) }
+            .onChange(of: queueExpanded) { scheduleAnchorCapture() }
         }
     }
 
     /// The one Artwork, morphing 264↔64 inside an AnyLayout (VStack under ↔ HStack beside);
     /// the two text blocks cross-fade in place (both always laid out, so the header height
-    /// never snaps at transition end).
+    /// never snaps at transition end). All fades ride `morphProgress` continuously; only the
+    /// non-interpolable layout swap keys off the mid-drag threshold.
     private func morphingHeader(_ tune: Tune) -> some View {
-        let layout = queueExpanded
+        let p = morphProgress
+        let layout = layoutExpanded
             ? AnyLayout(HStackLayout(alignment: .center, spacing: 12))
             : AnyLayout(VStackLayout(spacing: 16))
         return layout {
-            Artwork(tune: tune, size: queueExpanded ? 64 : 264)
-                .shadow(color: .black.opacity(queueExpanded ? 0.12 : 0.22),
-                        radius: queueExpanded ? 8 : 20, y: queueExpanded ? 4 : 10)
+            Artwork(tune: tune, size: layoutExpanded ? 64 : collapsedArtSize)
+                .shadow(color: .black.opacity(0.22 - 0.10 * p),
+                        radius: 20 - 12 * p, y: 10 - 6 * p)
             ZStack(alignment: .leading) {
                 titleBlock(tune)
                     .frame(maxWidth: .infinity)
-                    .opacity(queueExpanded ? 0 : 1)
+                    .opacity(1 - p)
                     .accessibilityHidden(queueExpanded)
                 compactTitles(tune)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .opacity(queueExpanded ? 1 : 0)
+                    .opacity(p)
                     .accessibilityHidden(!queueExpanded)
             }
         }
@@ -250,6 +382,7 @@ struct NowPlayingView: View {
     private func transport(scrollProxy: ScrollViewProxy) -> some View {
         HStack(spacing: 0) {
             Button {
+                modePulse += 1
                 // Same transaction for the reorder, the edit-mode exit, and the scroll: rows
                 // travel to their new slots instead of the list snapping (dogfood round 4, I5).
                 withAnimation(.snappy(duration: 0.35)) {
@@ -264,18 +397,19 @@ struct NowPlayingView: View {
                     .foregroundStyle(player.isShuffled ? CratesColor.accent : .primary)
             }
             .frame(maxWidth: .infinity)
-            Button { player.previous() } label: { Image(systemName: "backward.fill").font(.title) }
+            Button { transportPulse += 1; player.previous() } label: { Image(systemName: "backward.fill").font(.title) }
                 .frame(maxWidth: .infinity)
-            Button { player.togglePlayPause() } label: {
+            Button { transportPulse += 1; player.togglePlayPause() } label: {
                 Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.system(size: 62))
                     .foregroundStyle(CratesColor.accent)
                     .contentTransition(.symbolEffect(.replace))
             }
             .frame(maxWidth: .infinity)
-            Button { player.next() } label: { Image(systemName: "forward.fill").font(.title) }
+            .accessibilityIdentifier("playerPlayPause") // stable hook for UI tests (state-independent)
+            Button { transportPulse += 1; player.next() } label: { Image(systemName: "forward.fill").font(.title) }
                 .frame(maxWidth: .infinity)
-            Button { cycleRepeat() } label: {
+            Button { modePulse += 1; cycleRepeat() } label: {
                 Image(systemName: player.repeatMode == .one ? "repeat.1" : "repeat").font(.title3.weight(.semibold))
                     .foregroundStyle(player.repeatMode == .off ? .primary : CratesColor.accent)
             }
@@ -295,7 +429,7 @@ struct NowPlayingView: View {
         HStack(spacing: 8) {
             Image(systemName: "chevron.compact.up")
                 .font(.body.weight(.semibold))
-                .rotationEffect(.degrees(queueExpanded ? 180 : 0))
+                .rotationEffect(.degrees(180 * morphProgress)) // flips continuously with the drag
             // No count: "Queue · 2000" after playing a big crate is noise, not information.
             Text("Queue").font(.subheadline.weight(.semibold))
         }
@@ -340,6 +474,7 @@ struct NowPlayingView: View {
             }
         }
         .listStyle(.plain)
+        .accessibilityIdentifier("queueList") // scope for UI-test queries (crate rows share titles)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
         .listSectionSpacing(8)
@@ -374,6 +509,7 @@ struct NowPlayingView: View {
                 .contentShape(.rect)
                 .onTapGesture {
                     if let i = player.entries.firstIndex(where: { $0.id == entry.id }) {
+                        queuePulse += 1
                         player.jump(to: i)
                     }
                 }
@@ -384,9 +520,11 @@ struct NowPlayingView: View {
                     edges: .bottom) // no dangling separator under the final row
         }
         .onDelete { offsets in
+            queuePulse += 1
             player.removeFromQueue(at: IndexSet(offsets.map { $0 + baseIndex }))
         }
         .onMove { source, destination in
+            queuePulse += 1
             player.moveInQueue(from: IndexSet(source.map { $0 + baseIndex }),
                                to: destination + baseIndex)
         }
