@@ -107,6 +107,24 @@ final class AppModel {
             } else {
                 await runDeltaSync()          // background freshness on every launch
             }
+            // UI-test hook (offline litmus, Phase A): auto-download the first N tunes with
+            // server audio so Phase B can assert offline playback deterministically. Two
+            // hard-won subtleties: (1) parse raw argv like the other -uitest flags; (2) the
+            // real initial sync may be running in a RACING task — RootView's scene-active
+            // delta sync falls back to a quiet full sync on first launch, and the
+            // single-flight guard then makes OUR runInitialSync call a no-op — so wait,
+            // bounded, for the synced corpus to actually land before picking tunes.
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "-uitestDownloadCount"), i + 1 < args.count,
+               let n = Int(args[i + 1]), n > 0 {
+                var candidates: [Tune] { library.allTunes.filter { $0.hasServerAudio == true } }
+                for _ in 0..<120 where candidates.isEmpty {
+                    try? await Task.sleep(for: .seconds(1))
+                }
+                for tune in candidates.prefix(n) {
+                    downloads.downloadTune(tune)
+                }
+            }
         } else {
             enterDemoMode()
             await player.restoreQueue(mode: .demo)
@@ -221,8 +239,11 @@ final class AppModel {
             if case CratesAPIError.http(400) = error {
                 // Server rejected the cursor — drop it; the next attempt reseeds via full sync.
                 UserDefaults.standard.removeObject(forKey: AppModel.cursorKey)
+            } else {
+                // Server unreachable: stay silent (no walls), but let the status line say
+                // "Cached" honestly instead of a stale "Up to date" (offline litmus).
+                library.noteSyncFailure()
             }
-            // Otherwise silent: delta is background freshness, the cached library stays up.
         }
     }
 

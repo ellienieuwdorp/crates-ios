@@ -58,6 +58,11 @@ struct MiniPlayerView: View {
                 // An unplayable current track must not show a fully-enabled play button.
                 .disabled(player.playbackError != nil)
                 .opacity(player.playbackError != nil ? 0.35 : 1)
+                // Explicit label (symbol-derived labels are undefined behavior for VoiceOver
+                // and tests alike) — the offline litmus asserts play state through it. NOTE:
+                // a per-button identifier would be dead code: the container's "miniPlayer"
+                // identifier below propagates onto every child accessibility element.
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
                 Button {
                     player.next()
                 } label: {

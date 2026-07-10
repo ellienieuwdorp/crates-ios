@@ -28,6 +28,9 @@ struct BrowseView: View {
                         NavigationLink { GenresListView() } label: {
                             FacetEntryRow(title: "Genres", symbol: "tag")
                         }
+                        NavigationLink { DownloadedListView() } label: {
+                            FacetEntryRow(title: "Downloaded", symbol: "arrow.down.circle")
+                        }
                     }
                     // Curated tree: no hidden crates, no verifiably dead roots (see design doc).
                     Section("Crates") {
@@ -162,6 +165,50 @@ struct GenresListView: View {
         .listStyle(.plain)
         .navigationTitle("Genres")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// The downloaded-only surface (TODO §4, the kill-the-Wi-Fi litmus): every tune that is
+/// playable offline right now — DownloadManager's set (disk truth) joined against the library
+/// corpus, newest download first. Rows are the standard TrackRow, so play/queue/remove all
+/// work; with the server unreachable, tapping plays from the local file. Empty state is
+/// honest: nothing downloaded means nothing survives offline, and the copy says how to fix it.
+struct DownloadedListView: View {
+    @Environment(LibraryStore.self) private var library
+    @Environment(PlaybackController.self) private var player
+    @Environment(DownloadManager.self) private var downloads
+
+    private var tunes: [Tune] {
+        library.tunes(byIDs: Array(downloads.downloadedTuneIDs))
+            .sorted { (downloads.manifest[$0.id]?.completedAt ?? .distantPast)
+                    > (downloads.manifest[$1.id]?.completedAt ?? .distantPast) }
+    }
+
+    var body: some View {
+        let tunes = self.tunes
+        List {
+            ForEach(Array(tunes.enumerated()), id: \.element.id) { index, tune in
+                TrackRow(
+                    tune: tune,
+                    isCurrent: player.current?.id == tune.id,
+                    isDownloaded: true
+                ) {
+                    player.play(tunes, startingAt: index, context: "Downloaded")
+                }
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("Downloaded")
+        .navigationBarTitleDisplayMode(.inline)
+        .overlay {
+            if tunes.isEmpty {
+                ContentUnavailableView(
+                    "No Downloads",
+                    systemImage: "arrow.down.circle",
+                    description: Text("Downloaded tunes play without a connection. Touch and hold any tune to download it."))
+                .allowsHitTesting(false)
+            }
+        }
     }
 }
 

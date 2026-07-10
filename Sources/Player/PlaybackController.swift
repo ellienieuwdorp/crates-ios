@@ -124,6 +124,10 @@ final class PlaybackController {
     @ObservationIgnored private var lastSavedTime: Double = 0
     /// nonisolated: read from detached persistence tasks (precedent: AppModel.cursorKey).
     private nonisolated static let queueCacheKey = "queue_v1"
+    /// UI-test etiquette: `-uitestSilent` zeroes the AVPlayer's own volume (never the system's)
+    /// so live simulator runs can assert real playback without blasting audio from the host Mac.
+    @ObservationIgnored private let forceSilent =
+        ProcessInfo.processInfo.arguments.contains("-uitestSilent")
 
     init() {
         // Category only — activation waits for the first actual play, so launching the app never
@@ -551,6 +555,7 @@ final class PlaybackController {
 
         removeObservers()
         let p = player ?? AVPlayer()
+        if forceSilent { p.volume = 0 }
         p.replaceCurrentItem(with: item)
         player = p
         installObservers(on: item)

@@ -296,6 +296,14 @@ final class LibraryStore {
         if !rootCrates.isEmpty { rootState = .live }
     }
 
+    /// A background backup sync failed (server unreachable — the kill-the-Wi-Fi case): keep the
+    /// cached library on screen untouched, but flip the Home status line to its honest "Cached"
+    /// state instead of leaving a stale "Up to date". Never blocks, never walls.
+    func noteSyncFailure() {
+        guard isSnapshotBacked, !rootCrates.isEmpty else { return }
+        rootState = .failed("Server unreachable — showing the cached library.")
+    }
+
     // MARK: - Reads (cache-first)
 
     @discardableResult
@@ -332,8 +340,10 @@ final class LibraryStore {
 
     /// True while smart-crate definitions are still unfetched — Home seeding must wait, or the
     /// genre crates lose their seed slots to container fallbacks (seen live, 2026-07-10).
+    /// Demo mode is never pending: it has no server to hydrate queries from, so waiting would
+    /// block demo pin seeding forever (fresh-container SmokeTests failure, found 2026-07-10).
     var smartQueriesPending: Bool {
-        crateIndex.contains { $0.crate.kind == .smart && $0.crate.smartQuery == nil }
+        !isDemoBacked && crateIndex.contains { $0.crate.kind == .smart && $0.crate.smartQuery == nil }
     }
 
     /// True when this smart crate has a query we can't evaluate locally — the UI shows an
