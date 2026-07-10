@@ -32,6 +32,14 @@ struct LibraryAPI {
     // Lucene-backed (bare substrings match nothing), and the whole library is local anyway —
     // LibraryStore.searchTunes is the search path.
 
+    /// Report a play: absolute-value attribute write (playedCount + lastListenDate). The
+    /// endpoint SETS values — never increments — and silently ignores nulls; the payload shape
+    /// is verified live in docs/research/reports/server-probes-2026-07-10.md. Response is
+    /// `{"status":"ok"}`; any non-2xx throws and the caller keeps the report pending.
+    func reportPlay(_ report: PendingPlayReport) async throws {
+        try await client.rawPost("tunes/update.tunes.attributes", body: report.requestBody())
+    }
+
     /// Available audio-source types, for resolving `defaultAudioSourceType` → TrackSource.
     func audioSourceTypes() async throws -> [AudioSourceType] {
         try await client.get("audiosource/types", as: [AudioSourceType].self)

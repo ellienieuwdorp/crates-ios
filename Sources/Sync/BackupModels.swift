@@ -21,6 +21,7 @@ enum Backup {
         let DateLastModified: String?    // the server's delta filter column for this table
         let CoverID: Int64?
         let PlayedCount: Int?
+        let ObjectId: String?            // server bean id — rides along on attribute writes
         let DefaultAudioSourceType: Int? // 1 = local file, 5 = bandcamp (from /audiosource/types)
         let PageUrl: String?
         let TuneDefaultLocation: String?

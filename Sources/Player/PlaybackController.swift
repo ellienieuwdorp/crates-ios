@@ -427,8 +427,15 @@ final class PlaybackController {
     /// user explicitly asking for the next track).
     func next() { advance(honorRepeatOne: false) }
 
-    /// Natural end-of-track: honors repeat-one.
-    private func trackDidEnd() { advance(honorRepeatOne: true) }
+    /// Fired exactly at natural completion — the played-to-the-end moment, never a skip or a
+    /// failure. AppModel wires this into play-count sync (TODO §5).
+    @ObservationIgnored var onTrackCompleted: ((Tune) -> Void)?
+
+    /// Natural end-of-track: count the completed play, then honor repeat-one.
+    private func trackDidEnd() {
+        if let tune = current { onTrackCompleted?(tune) }
+        advance(honorRepeatOne: true)
+    }
 
     private func advance(honorRepeatOne: Bool) {
         guard let i = currentIndex else { return }

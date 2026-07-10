@@ -20,6 +20,15 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
     /// Whether the SERVER can stream this tune (an AudioFiles row with a codec exists).
     /// nil = unknown (stale pre-round-4 cache) — treat unknown as playable, never dim on a guess.
     var hasServerAudio: Bool?
+    /// Play count as last synced/reported. nil = unknown (stale cache) — treated as 0 when a
+    /// play is counted. The server's update endpoint sets ABSOLUTE values, so this local value
+    /// is the base for `current + 1` play reports (see PlaySync).
+    var playedCount: Int?
+    /// Locally observed last-listen moment; the backup export carries no such column, so this
+    /// only ever comes from on-device plays (or the REST bean).
+    var lastListenDate: Date?
+    /// The server bean's objectID — rides along on attribute writes (desktop parity).
+    var objectID: String?
 
     /// Honest playability: unplayable only when we know the server has no audio for it.
     /// (A local download would still play — callers overlay that separately.)
@@ -36,6 +45,7 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
         case dateAdded, pageUrl
         case purchasedFrom
         case defaultAudioSourceType
+        case playedCount, lastListenDate, objectID
     }
 
     /// Symmetric representation for the local disk cache. The server-shaped decoder is lossy by
@@ -48,6 +58,9 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
         var rating: Int?; var coverID: Int64?; var dateAdded: Date?
         var source: TrackSource; var pageURL: String?
         var hasServerAudio: Bool? = nil // v1 caches lack it → decodes nil (unknown)
+        var playedCount: Int? = nil     // pre-play-sync caches lack these three → nil (unknown)
+        var lastListenDate: Date? = nil
+        var objectID: String? = nil
     }
 
     init(from decoder: Decoder) throws {
@@ -58,6 +71,8 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
             key = cached.key; rating = cached.rating; coverID = cached.coverID
             dateAdded = cached.dateAdded; source = cached.source; pageURL = cached.pageURL
             hasServerAudio = cached.hasServerAudio
+            playedCount = cached.playedCount; lastListenDate = cached.lastListenDate
+            objectID = cached.objectID
             return
         }
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -80,6 +95,9 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
         let purchased = try c.decodeFlexibleInt(.purchasedFrom)
         source = Tune.sourceFromStoreID(purchased)
         hasServerAudio = nil // REST shape carries no AudioFiles join
+        playedCount = try c.decodeFlexibleInt(.playedCount)
+        lastListenDate = ServerDate.parse(try c.decodeIfPresent(String.self, forKey: .lastListenDate))
+        objectID = try c.decodeIfPresent(String.self, forKey: .objectID)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -88,7 +106,8 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
             id: id, title: title, artist: artist, album: album, genre: genre,
             lengthSeconds: lengthSeconds, bpm: bpm, key: key, rating: rating,
             coverID: coverID, dateAdded: dateAdded, source: source, pageURL: pageURL,
-            hasServerAudio: hasServerAudio))
+            hasServerAudio: hasServerAudio, playedCount: playedCount,
+            lastListenDate: lastListenDate, objectID: objectID))
     }
 
     /// Direct memberwise init for previews / tests / cache reconstruction.
@@ -96,11 +115,14 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
          genre: String? = nil, lengthSeconds: Double? = nil, bpm: String? = nil,
          key: String? = nil, rating: Int? = nil, coverID: Int64? = nil,
          dateAdded: Date? = nil, source: TrackSource = .unknown, pageURL: String? = nil,
-         hasServerAudio: Bool? = nil) {
+         hasServerAudio: Bool? = nil, playedCount: Int? = nil,
+         lastListenDate: Date? = nil, objectID: String? = nil) {
         self.id = id; self.title = title; self.artist = artist; self.album = album
         self.genre = genre; self.lengthSeconds = lengthSeconds; self.bpm = bpm; self.key = key
         self.rating = rating; self.coverID = coverID; self.dateAdded = dateAdded
         self.source = source; self.pageURL = pageURL; self.hasServerAudio = hasServerAudio
+        self.playedCount = playedCount; self.lastListenDate = lastListenDate
+        self.objectID = objectID
     }
 
     static func sourceFromStoreID(_ id: Int?) -> TrackSource {

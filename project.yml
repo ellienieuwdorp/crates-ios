@@ -13,6 +13,12 @@ packages:
 
 settings:
   base:
+    # Belt-and-braces against a broken generator on this machine: ~/.omlx/bin/xcodegen (first
+    # in PATH) is missing its share/xcodegen/SettingPresets and silently emits a project with
+    # NO default settings — PRODUCT_NAME resolves empty and the build dies with "Multiple
+    # commands produce …/.app". Regenerate with /opt/homebrew/bin/xcodegen (intact presets);
+    # this pin keeps the product named even if the broken binary is used by accident.
+    PRODUCT_NAME: "$(TARGET_NAME)"
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "0.2.0"
@@ -26,6 +32,28 @@ settings:
     # Automatic signing with Ellie's team so builds work on device + simulator.
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: C8N8X74Y27
+  configs:
+    Debug:
+      # Simulator test runs must not fan out to x86_64: the SPM ZIPFoundation product only
+      # builds for the active arch, so a universal Debug link dies on missing x86_64 symbols.
+      # (Also in the Debug preset — pinned for the same broken-generator reason as above.)
+      ONLY_ACTIVE_ARCH: YES
+
+# Explicit shared scheme: the implicit scheme stopped including the unit-test bundle (only
+# CratesUITests ran), silently skipping the whole CratesTests suite on `xcodebuild test`.
+schemes:
+  CratesIOS:
+    build:
+      targets:
+        CratesIOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - CratesTests
+        - CratesUITests
 
 targets:
   CratesIOS:
