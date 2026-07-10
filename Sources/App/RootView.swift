@@ -9,6 +9,11 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showNowPlaying = false
     @State private var selection: AppTab = .home
+    /// Shared namespace for the mini→full player zoom transition: the accessory pill is the
+    /// `matchedTransitionSource`, the sheet content declares `.navigationTransition(.zoom)`.
+    /// (DTS-recommended sheet pattern — see docs/research/reports/
+    /// interaction-design-swiftui-techniques.md §2.2.)
+    @Namespace private var playerZoom
 
     var body: some View {
         // The accessory is attached unconditionally: swapping between `tabs` and
@@ -22,9 +27,15 @@ struct RootView: View {
         tabs
             .tabViewBottomAccessory {
                 MiniPlayerView { if player.hasContent { showNowPlaying = true } }
+                    .matchedTransitionSource(id: "player", in: playerZoom)
             }
             .sheet(isPresented: $showNowPlaying) {
+                // The zoom modifier lives on the sheet-content root HERE, at the presentation
+                // site, so NowPlayingView stays presentation-agnostic. It composes with the
+                // player's own custom detents: the sheet zooms out of the accessory pill and
+                // settles at the measured collapsed detent (frame-burst verified, 2026-07-10).
                 NowPlayingView()
+                    .navigationTransition(.zoom(sourceID: "player", in: playerZoom))
             }
             .onChange(of: scenePhase) { _, phase in
                 // Foreground = freshness moment; runDeltaSync self-debounces (90s), and any

@@ -56,6 +56,7 @@
 		A52EC1976FEA6166A9CC5275 /* SmartQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE634843E978B85EEE0C7282 /* SmartQuery.swift */; };
 		AA1746B31B2E5C22497A447F /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9646B84DADDFB8E8C9953DCA /* KeychainStoreTests.swift */; };
 		AFE8057617531AB7E9AA2A4A /* Crate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9531702C1597A6D684CAB237 /* Crate.swift */; };
+		B33FA8B00E195C98DF10BC77 /* MiniPlayerGestureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 048D6C7E490589D33768F8B6 /* MiniPlayerGestureTests.swift */; };
 		B8B1C46428339E1A98852AC0 /* ScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2986BFF1004568DA5842224F /* ScreenshotTests.swift */; };
 		B903A9952F2E74222545585F /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2831DF324E73C40736A0907D /* SearchView.swift */; };
 		C4BB6F3E37A22A7CFB37978E /* BackupImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79138C52D1C29791E4570485 /* BackupImporterTests.swift */; };
@@ -92,6 +93,7 @@
 /* Begin PBXFileReference section */
 		01C639DEEBCB4351FFA0C70B /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		040A9DAFF20006CF83CB22EE /* RecentSearches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentSearches.swift; sourceTree = "<group>"; };
+		048D6C7E490589D33768F8B6 /* MiniPlayerGestureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerGestureTests.swift; sourceTree = "<group>"; };
 		09C53A00C491E2EBE88B90FC /* DownloadTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadTransport.swift; sourceTree = "<group>"; };
 		0AA50F05EEABD9FC9A000343 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealLibraryShotTest.swift; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 				B97A148B98248F4F4CBFAE43 /* LivePairingTest.swift */,
 				A0B0D37223E35F3E60E14B6B /* LivePlayTest.swift */,
 				3D19A7281B794E6698F584CD /* LiveScreenshotTests.swift */,
+				048D6C7E490589D33768F8B6 /* MiniPlayerGestureTests.swift */,
 				51A28F86044CB3E3495EC0E5 /* OfflineLitmusTest.swift */,
 				0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */,
 				2986BFF1004568DA5842224F /* ScreenshotTests.swift */,
@@ -603,6 +606,7 @@
 				2C3DA8211F82FD862B5D00BC /* LivePairingTest.swift in Sources */,
 				616BD4C3957217B27F137B53 /* LivePlayTest.swift in Sources */,
 				560EB1EAA6EF856610AEB03B /* LiveScreenshotTests.swift in Sources */,
+				B33FA8B00E195C98DF10BC77 /* MiniPlayerGestureTests.swift in Sources */,
 				3932BC85E71E05FA1C86A03D /* OfflineLitmusTest.swift in Sources */,
 				8DBAF9E08293DCC21C862AB0 /* RealLibraryShotTest.swift in Sources */,
 				B8B1C46428339E1A98852AC0 /* ScreenshotTests.swift in Sources */,
