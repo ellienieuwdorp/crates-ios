@@ -22,6 +22,7 @@
 		2C3DA8211F82FD862B5D00BC /* LivePairingTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B97A148B98248F4F4CBFAE43 /* LivePairingTest.swift */; };
 		358CF6AA3D432B6FBEC46AEC /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B52175EEB07FE9E3CDA89BE /* LibraryStore.swift */; };
 		37B6B5FEA9BDA8D502829F75 /* CratesConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C04C2F4BAF6E99DB006C6D3 /* CratesConnection.swift */; };
+		39D392488E0705343E812D61 /* PlaySyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE79EF9035A28BDB36894AAB /* PlaySyncTests.swift */; };
 		3A233EE9BF91FB17D855A02F /* PairingAndConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700EA676F979A703F57D16E1 /* PairingAndConnectionTests.swift */; };
 		3B3A79535A0CEF2F83BC800D /* QueuePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29AA6EDB730DEFDA1F6196EB /* QueuePersistenceTests.swift */; };
 		3F630BAE5489C3071CC41368 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AA50F05EEABD9FC9A000343 /* SettingsView.swift */; };
@@ -36,6 +37,7 @@
 		6506251F8EE057C483DA7597 /* TrackSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5C740E1B0001B9CCA78AF6 /* TrackSource.swift */; };
 		69B9F44E5EC77BDE65BBA88B /* TrackRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBF48485281E435434369C0 /* TrackRow.swift */; };
 		6A31E1A7D591475AB07D57A0 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC00D64A8A0FD34A11896FF /* NowPlayingView.swift */; };
+		6ED5DEE6CB120330965E668D /* LiveFLACStreamTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60149A16503774A63D1B64C /* LiveFLACStreamTest.swift */; };
 		7352AB267719927155144FE9 /* CratesTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75CDC4BE75A96D0E25D292BB /* CratesTheme.swift */; };
 		7E64F5853557FEA64C7A9C36 /* SmartQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9509D1AC5DEA3B2F21D9D6B /* SmartQueryTests.swift */; };
 		7FD5D644AE52B066CB334045 /* QueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1347EC1CF272B96885E64A /* QueueView.swift */; };
@@ -63,6 +65,7 @@
 		D69FBF1737A8B7A89748E64B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DC33A75CD4CD95B8B448AAA5 /* Assets.xcassets */; };
 		D6F3E8297D040DF4818BE7C6 /* DiskCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DF942A696A92EBB50FA46CE /* DiskCache.swift */; };
 		D710B886D5C798830C043D6D /* BackupModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBF5F8C28005848314B631B3 /* BackupModels.swift */; };
+		DCD61B6C8383EBDB37AC9F14 /* PlaySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4F7597E2D8C39DB4B1582D /* PlaySync.swift */; };
 		DE69C9B1BE580D57745B3545 /* DownloadPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FE5ACC091E29F4EC940BBFB /* DownloadPolicyView.swift */; };
 		E73E8EDDF4129602F3226569 /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF0C39026FFC092EAE7BF08 /* Artwork.swift */; };
 		F324136B0A2E8153BF641CDE /* BandcampResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8409104653FAA137A98C1DE3 /* BandcampResolver.swift */; };
@@ -129,12 +132,21 @@
 		8409104653FAA137A98C1DE3 /* BandcampResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampResolver.swift; sourceTree = "<group>"; };
 		891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSearchTests.swift; sourceTree = "<group>"; };
 		9531702C1597A6D684CAB237 /* Crate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crate.swift; sourceTree = "<group>"; };
+<<<<<<< HEAD
 		9646B84DADDFB8E8C9953DCA /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
 		9FE5ACC091E29F4EC940BBFB /* DownloadPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPolicyView.swift; sourceTree = "<group>"; };
 		A0B0D37223E35F3E60E14B6B /* LivePlayTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePlayTest.swift; sourceTree = "<group>"; };
 		A456A4D9CBF7C3EB501DC039 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
 		B9509D1AC5DEA3B2F21D9D6B /* SmartQueryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartQueryTests.swift; sourceTree = "<group>"; };
+=======
+		9B4F7597E2D8C39DB4B1582D /* PlaySync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaySync.swift; sourceTree = "<group>"; };
+		9FE5ACC091E29F4EC940BBFB /* DownloadPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadPolicyView.swift; sourceTree = "<group>"; };
+		A0B0D37223E35F3E60E14B6B /* LivePlayTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePlayTest.swift; sourceTree = "<group>"; };
+		A456A4D9CBF7C3EB501DC039 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
+		B60149A16503774A63D1B64C /* LiveFLACStreamTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveFLACStreamTest.swift; sourceTree = "<group>"; };
+>>>>>>> worktree-agent-a8999b8d442cae226
 		B97A148B98248F4F4CBFAE43 /* LivePairingTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePairingTest.swift; sourceTree = "<group>"; };
+		BE79EF9035A28BDB36894AAB /* PlaySyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaySyncTests.swift; sourceTree = "<group>"; };
 		C9DBD9B048F7CEE024356958 /* BandcampPreviewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampPreviewTests.swift; sourceTree = "<group>"; };
 		CCF28E3976FF11B2DAAAC3BD /* QueueLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueLogicTests.swift; sourceTree = "<group>"; };
 		CDB0525955F8F477948F18C4 /* LiveDownloadTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveDownloadTest.swift; sourceTree = "<group>"; };
@@ -236,9 +248,14 @@
 				45684C62CA4C37C2E03DDBE7 /* DecodingTests.swift */,
 				5A32601A1D3E54C34BD5D25B /* DeltaMergeTests.swift */,
 				1D2D1986C9F3800CB666E437 /* DownloadEngineTests.swift */,
+<<<<<<< HEAD
 				9646B84DADDFB8E8C9953DCA /* KeychainStoreTests.swift */,
+=======
+				B60149A16503774A63D1B64C /* LiveFLACStreamTest.swift */,
+>>>>>>> worktree-agent-a8999b8d442cae226
 				891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */,
 				700EA676F979A703F57D16E1 /* PairingAndConnectionTests.swift */,
+				BE79EF9035A28BDB36894AAB /* PlaySyncTests.swift */,
 				CCF28E3976FF11B2DAAAC3BD /* QueueLogicTests.swift */,
 				29AA6EDB730DEFDA1F6196EB /* QueuePersistenceTests.swift */,
 				E34C7F1285927AD30655C234 /* RetentionPolicyTests.swift */,
@@ -252,6 +269,7 @@
 			children = (
 				195A3F980802D97CF3E62D69 /* BackupImporter.swift */,
 				DBF5F8C28005848314B631B3 /* BackupModels.swift */,
+				9B4F7597E2D8C39DB4B1582D /* PlaySync.swift */,
 				D48276B96A37B5A810C48BC1 /* SyncClient.swift */,
 			);
 			path = Sync;
@@ -545,6 +563,7 @@
 				A15FFA323153EDF5BB12B357 /* MiniPlayerView.swift in Sources */,
 				6A31E1A7D591475AB07D57A0 /* NowPlayingView.swift in Sources */,
 				1322D72D6871E728D5CC00CF /* PairingService.swift in Sources */,
+				DCD61B6C8383EBDB37AC9F14 /* PlaySync.swift in Sources */,
 				A08673CF1D78AB184D310346 /* PlaybackController.swift in Sources */,
 				7FD5D644AE52B066CB334045 /* QueueView.swift in Sources */,
 				254B263F7452CC17BD027798 /* RecentSearches.swift in Sources */,
@@ -570,9 +589,14 @@
 				CE522E480E702CE5219AFC11 /* DecodingTests.swift in Sources */,
 				2BF1942268CE811AEB47E24D /* DeltaMergeTests.swift in Sources */,
 				8E96EAEE473344519223A6C3 /* DownloadEngineTests.swift in Sources */,
+<<<<<<< HEAD
 				AA1746B31B2E5C22497A447F /* KeychainStoreTests.swift in Sources */,
+=======
+				6ED5DEE6CB120330965E668D /* LiveFLACStreamTest.swift in Sources */,
+>>>>>>> worktree-agent-a8999b8d442cae226
 				9692C1262D590412FF9C7EED /* LocalSearchTests.swift in Sources */,
 				3A233EE9BF91FB17D855A02F /* PairingAndConnectionTests.swift in Sources */,
+				39D392488E0705343E812D61 /* PlaySyncTests.swift in Sources */,
 				984BCB0CA1D98D5FAED7AE50 /* QueueLogicTests.swift in Sources */,
 				3B3A79535A0CEF2F83BC800D /* QueuePersistenceTests.swift in Sources */,
 				855017B1ECF71EDEE6BCD137 /* RetentionPolicyTests.swift in Sources */,
@@ -615,7 +639,14 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.crates.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CratesIOS.app/CratesIOS";
 			};
 			name = Release;
@@ -623,22 +654,38 @@
 		7B0876A68C548A574D805854 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = Resources/Info.plist;
 				INFOPLIST_KEY_NSAppTransportSecurity = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.crates.ios.app;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
 		8439025450E5B56E9198E902 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.crates.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = CratesIOS;
 			};
 			name = Debug;
@@ -646,9 +693,40 @@
 		88EED0F6063294F95EC243F0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
+<<<<<<< HEAD
 				DEAD_CODE_STRIPPING = NO;
 				DEVELOPMENT_TEAM = C8N8X74Y27;
 				ENABLE_DEBUG_DYLIB = NO;
@@ -661,6 +739,36 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+=======
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = C8N8X74Y27;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.2.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+>>>>>>> worktree-agent-a8999b8d442cae226
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
@@ -670,14 +778,22 @@
 		8E9B986941012DDAF1CA6F01 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = Resources/Info.plist;
 				INFOPLIST_KEY_NSAppTransportSecurity = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.crates.ios.app;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -686,7 +802,14 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.crates.ios.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CratesIOS.app/CratesIOS";
 			};
 			name = Debug;
@@ -694,8 +817,16 @@
 		B384908A2038D198C2CF19D1 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = co.crates.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = CratesIOS;
 			};
 			name = Release;
@@ -703,15 +834,64 @@
 		E06236D332B1970808EAB5EA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = C8N8X74Y27;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.2.0;
+<<<<<<< HEAD
+=======
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+>>>>>>> worktree-agent-a8999b8d442cae226
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
 			};

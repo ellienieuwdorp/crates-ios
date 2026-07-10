@@ -198,7 +198,11 @@ enum BackupImporter {
                 // The server refuses to stream tunes without a codec ("Codec of the tune is
                 // null") — mark them so rows can be honest up front instead of tap → error.
                 hasServerAudio: audio?.Codec != nil,
-                genres: genresByTune[r.TuneID] ?? []
+                genres: genresByTune[r.TuneID] ?? [],
+                // Play-sync base: the server's count as of this sync. (No LastListenDate
+                // column exists in the export — that stays local-only.)
+                playedCount: r.PlayedCount,
+                objectID: r.ObjectId
             )
         }
 

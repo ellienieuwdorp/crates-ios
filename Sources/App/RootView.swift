@@ -27,8 +27,12 @@ struct RootView: View {
                 NowPlayingView()
             }
             .onChange(of: scenePhase) { _, phase in
-                // Foreground = freshness moment; runDeltaSync self-debounces (90s).
-                if phase == .active { Task { await model.runDeltaSync() } }
+                // Foreground = freshness moment; runDeltaSync self-debounces (90s), and any
+                // pending play reports get a fresh flush attempt (reachability may have changed).
+                if phase == .active {
+                    model.plays.flushSoon()
+                    Task { await model.runDeltaSync() }
+                }
             }
     }
 

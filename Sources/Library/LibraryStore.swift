@@ -85,6 +85,31 @@ final class LibraryStore {
         s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).lowercased()
     }
 
+    /// Freshest cached copy of a tune — queue entries hold snapshots from when they were
+    /// enqueued, so play counting reads through here instead.
+    func tune(byID id: Int64) -> Tune? { allTunes.first { $0.id == id } }
+
+    /// A play was counted locally: mirror the new absolute count into the cache so repeated
+    /// plays keep counting up and any UI reading counts stays honest. Persists the flat corpus
+    /// and every hydrated crate list holding the tune; unhydrated per-crate disk caches catch
+    /// up on the next sync (our own write bumps the server's DateLastModified, so the delta
+    /// re-ships the row).
+    func applyLocalPlay(tuneID: Int64, playedCount: Int, at date: Date) {
+        if let i = allTunes.firstIndex(where: { $0.id == tuneID }) {
+            allTunes[i].playedCount = playedCount
+            allTunes[i].lastListenDate = date
+            let all = allTunes
+            Task.detached { await DiskCache.shared.save(all, key: "all_tunes") }
+        }
+        for (crateID, tunes) in tunesByCrate {
+            guard let j = tunes.firstIndex(where: { $0.id == tuneID }) else { continue }
+            tunesByCrate[crateID]?[j].playedCount = playedCount
+            tunesByCrate[crateID]?[j].lastListenDate = date
+            let snapshot = tunesByCrate[crateID] ?? []
+            Task.detached { await DiskCache.shared.save(snapshot, key: "tunes_\(crateID)") }
+        }
+    }
+
     // MARK: - Crate finder (the tree's problem is depth, not breadth — jump straight to a crate)
 
     struct CrateIndexEntry: Codable, Sendable, Identifiable {

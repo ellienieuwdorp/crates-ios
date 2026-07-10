@@ -14,6 +14,7 @@ final class AppModel {
     let downloads = DownloadManager()
     let usage = UsageLog()
     let pins = HomePins()
+    let plays = PlayReporter()
 
     var isPaired: Bool { connection.isConfigured }
     /// Demo mode lets the POC render a realistic library with no server (simulator, screenshots).
@@ -58,9 +59,26 @@ final class AppModel {
         downloads.attach(client: client, connection: connection)
         player.attach(connection: connection, downloads: downloads)
         downloads.nowPlayingTuneID = { [weak player] in player?.current?.id }
+        // Track START feeds the local usage log (Recently Played shelf); track COMPLETION
+        // feeds the server play-count report. Different moments, deliberately.
         player.onTrackStarted = { [weak self] tune in self?.usage.recordTunePlay(tune.id) }
+        plays.attach(client: client)
+        player.onTrackCompleted = { [weak self] tune in self?.recordPlay(of: tune) }
         let conn = connection
         Task { await ArtworkStore.shared.update(connection: conn) }
+    }
+
+    /// A track played to completion: count it locally and queue the play report. The server's
+    /// update endpoint sets ABSOLUTE values, so the count sent is local+1 — a concurrent desktop
+    /// play can be overwritten (read-modify-write race; accepted POC limitation, see
+    /// docs/research/reports/server-probes-2026-07-10.md).
+    private func recordPlay(of tune: Tune) {
+        guard isPaired, !isDemo else { return } // demo plays are not real listens
+        let cached = library.tune(byID: tune.id) // fresher than the queue's enqueue-time snapshot
+        let newCount = plays.recordPlay(tuneID: tune.id,
+                                        objectID: cached?.objectID ?? tune.objectID,
+                                        localPlayedCount: cached?.playedCount ?? tune.playedCount)
+        library.applyLocalPlay(tuneID: tune.id, playedCount: newCount, at: Date())
     }
 
     func bootstrap() async {
@@ -75,6 +93,7 @@ final class AppModel {
         }
         await library.hydrateFromDisk()
         await usage.hydrate()
+        await plays.hydrate() // offline plays from a previous launch flush after the sync below
         pins.configure(demo: false)
         if isPaired {
             // Paired ⇒ the library is backup-synced; disk cache is the source of truth.
@@ -152,6 +171,7 @@ final class AppModel {
         // The authoritative seed pass: candidates are only complete once smart queries hydrate
         // (HomeView's own seeding defers while they're pending).
         pins.seedIfNeeded(candidates: library.seedCandidates(), oldDefault: library.rootCrates)
+        plays.flushSoon() // post-sync: the server is clearly reachable right now
         if !quiet { onboarding = .syncing("Done — \(result.snapshot.tuneCount) tunes", 1.0) }
     }
 
@@ -196,6 +216,7 @@ final class AppModel {
             }
             await library.hydrateSmartQueries()
             pins.seedIfNeeded(candidates: library.seedCandidates(), oldDefault: library.rootCrates)
+            plays.flushSoon() // post-sync: the server is clearly reachable right now
         } catch {
             if case CratesAPIError.http(400) = error {
                 // Server rejected the cursor — drop it; the next attempt reseeds via full sync.
@@ -233,6 +254,7 @@ final class AppModel {
     func signOut() {
         player.stop()
         player.eraseQueuePersistence() // a re-pair to a different server could collide on tune IDs
+        plays.erase() // pending reports carry the old server's tune IDs
         connection = CratesConnection(host: "", port: CratesConnection.defaultPort, token: "")
         UserDefaults.standard.removeObject(forKey: AppModel.connKey)
         UserDefaults.standard.removeObject(forKey: AppModel.cursorKey) // next pairing starts with a full sync

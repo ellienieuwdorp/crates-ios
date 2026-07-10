@@ -9,7 +9,8 @@ struct DeltaMergeTests {
     private func tuneRow(_ id: Int64, title: String, modified: String? = nil) -> Backup.TuneRow {
         .init(TuneID: id, TuneTitle: title, TuneName: nil, Artist: "a", Album: nil, Genre: nil,
               TuneLength: nil, DateAdded: nil, DateLastModified: modified, CoverID: nil,
-              PlayedCount: nil, DefaultAudioSourceType: 1, PageUrl: nil, TuneDefaultLocation: nil)
+              PlayedCount: nil, ObjectId: nil, DefaultAudioSourceType: 1, PageUrl: nil,
+              TuneDefaultLocation: nil)
     }
     private func audioRow(_ id: Int64, tune: Int64, bpm: String, modified: String? = nil) -> Backup.AudioFileRow {
         .init(AudioFileID: id, TuneID: tune, Bpm: bpm, Key: nil, Codec: "MP3",

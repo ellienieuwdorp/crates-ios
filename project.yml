@@ -13,9 +13,11 @@ packages:
 
 settings:
   base:
-    # Make Xcode's built-in default explicit: some toolchains stop applying it, leaving an empty
-    # PRODUCT_NAME → a "…/.app" wrapper and a "Multiple commands produce '.app'" build failure.
-    # Resolves per target ($(TARGET_NAME)), so packages/tests keep their own names.
+    # Belt-and-braces against a broken generator on this machine: ~/.omlx/bin/xcodegen (first
+    # in PATH) is missing its share/xcodegen/SettingPresets and silently emits a project with
+    # NO default settings — PRODUCT_NAME resolves empty and the build dies with "Multiple
+    # commands produce …/.app". Regenerate with /opt/homebrew/bin/xcodegen (intact presets);
+    # these pins keep the standard defaults applied even if the broken binary runs by accident.
     PRODUCT_NAME: "$(TARGET_NAME)"
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
