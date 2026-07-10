@@ -265,6 +265,17 @@ struct CrateDetailView: View {
     private var tunes: [Tune] { library.tunes(in: crate.id) }
     private var subcrates: [Crate] { library.children(of: crate.id) }
 
+    /// Cache freshness as an honest menu row (Philosophy #3), replacing the standalone toolbar
+    /// dot. Symbols carry the meaning the way system menus do; the words say it plainly.
+    private var freshness: (label: String, symbol: String) {
+        switch library.state(for: crate.id) {
+        case .idle:         ("Not loaded yet", "circle.dashed")
+        case .revalidating: ("Updating…", "arrow.triangle.2.circlepath")
+        case .live:         ("Up to date", "checkmark.circle")
+        case .failed:       ("Offline — showing cached", "exclamationmark.icloud")
+        }
+    }
+
     var body: some View {
         List {
             if !subcrates.isEmpty {
@@ -301,12 +312,14 @@ struct CrateDetailView: View {
         .navigationTitle(crate.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // Freshness of THIS crate's cached tunes, per Philosophy #3 — never block, always hint.
-            ToolbarItem(placement: .topBarTrailing) {
-                StatusDot(state: library.state(for: crate.id))
-            }
+            // One honest control in the bar: the menu. Freshness (Philosophy #3) lives as a
+            // non-interactive first row INSIDE it, so the status never reads as a second button
+            // sharing the ellipsis's Liquid Glass capsule.
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Section {
+                        Label(freshness.label, systemImage: freshness.symbol)
+                    }
                     Button { playAll() } label: { Label("Play All", systemImage: "play.fill") }
                         .disabled(tunes.isEmpty)
                     Button { for t in tunes { player.addToEndOfQueue(t) } } label: { Label("Queue All", systemImage: "text.append") }

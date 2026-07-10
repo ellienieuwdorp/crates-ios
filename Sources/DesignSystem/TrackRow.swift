@@ -15,6 +15,7 @@ struct TrackRow: View {
     @Environment(DownloadManager.self) private var downloads
     @State private var lastAction: QueueAction? = nil
     @State private var feedbackTrigger = 0
+    @State private var playTrigger = 0
 
     enum QueueAction: Equatable { case queued, playNext }
 
@@ -70,7 +71,11 @@ struct TrackRow: View {
         }
         .opacity(isUnplayable ? 0.45 : 1) // honest: this row can't produce sound on this phone
         .contentShape(.rect)
-        .onTapGesture(perform: onTap)
+        .onTapGesture {
+            // Subtle acknowledgment that the tap took — playback starts a beat later.
+            if !isUnplayable { playTrigger += 1 }
+            onTap()
+        }
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button {
                 player.addToEndOfQueue(tune)
@@ -100,7 +105,8 @@ struct TrackRow: View {
                 }
             }
         }
-        .sensoryFeedback(.success, trigger: feedbackTrigger)
+        .sensoryFeedback(.success, trigger: feedbackTrigger)   // swipe → queue-next / queue-last
+        .sensoryFeedback(.impact(weight: .light), trigger: playTrigger) // tap → play
         .overlay(alignment: .trailing) {
             if let action = lastAction {
                 confirmationBadge(action)
