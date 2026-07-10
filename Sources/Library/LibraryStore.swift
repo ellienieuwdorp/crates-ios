@@ -103,8 +103,21 @@ final class LibraryStore {
     private var previewCoversByCrate: [Int64: [Int64]] = [:]
 
     func crate(byID id: Int64) -> Crate? { crateByID[id] }
-    /// Mosaic covers for a crate tile (empty = symbol fallback).
-    func previewCoverIDs(for crateID: Int64) -> [Int64] { previewCoversByCrate[crateID] ?? [] }
+    /// Mosaic covers for a crate tile (empty = symbol fallback). Smart crates have no import-time
+    /// previews (no backup memberships) — derive them from the materialized tunes instead.
+    func previewCoverIDs(for crateID: Int64) -> [Int64] {
+        if let p = previewCoversByCrate[crateID], !p.isEmpty { return p }
+        guard let crate = crateByID[crateID], crate.kind == .smart else { return [] }
+        var covers: [Int64] = []
+        var seen = Set<Int64>()
+        for t in materializedSmartTunes(for: crate) {
+            if let c = t.coverID, seen.insert(c).inserted {
+                covers.append(c)
+                if covers.count == 4 { break }
+            }
+        }
+        return covers
+    }
 
     private func setCrateIndex(_ entries: [CrateIndexEntry]) {
         crateIndex = entries
@@ -292,6 +305,12 @@ final class LibraryStore {
 
     private var smartTunesCache: [Int64: [Tune]] = [:]
 
+    /// True while smart-crate definitions are still unfetched — Home seeding must wait, or the
+    /// genre crates lose their seed slots to container fallbacks (seen live, 2026-07-10).
+    var smartQueriesPending: Bool {
+        crateIndex.contains { $0.crate.kind == .smart && $0.crate.smartQuery == nil }
+    }
+
     /// True when this smart crate has a query we can't evaluate locally — the UI shows an
     /// honest "computed on the desktop" state instead of a silently-empty list.
     func smartCrateUnsupported(_ crate: Crate) -> Bool {
@@ -352,10 +371,14 @@ final class LibraryStore {
 
     // MARK: - Curation (Home seeds, Browse roots) — the honesty rules
 
+    /// Well-known system crate IDs (fixed, from `/crates/default.crates`) that are pure
+    /// plumbing: File System mirror, play queues, external devices, news feed, search scratch.
+    private static let plumbingCrateIDs: Set<Int64> = [2, 12, 13, 14, 18, 19, 28]
+
     /// True when auto-surfacing this crate anywhere would be dishonest or useless: hidden,
     /// system plumbing, the file mirror, or (for non-smart crates) verifiably empty.
     private func isSurfaceable(_ crate: Crate) -> Bool {
-        if crate.isHidden || crate.isFolderMirror { return false }
+        if crate.isHidden || crate.isFolderMirror || Self.plumbingCrateIDs.contains(crate.id) { return false }
         if crate.kind == .playlist || crate.kind == .history || crate.kind == .search { return false }
         if crate.kind == .smart { return !tunes(in: crate.id).isEmpty }
         return (crate.tuneCount ?? 0) > 0 || crate.hasChildren

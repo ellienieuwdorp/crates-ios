@@ -41,14 +41,21 @@ struct HomeView: View {
             }
             .onAppear {
                 library.refreshRoot()
-                model.pins.seedIfNeeded(candidates: library.seedCandidates(),
-                                        oldDefault: library.rootCrates)
+                seedPins()
             }
-            .onChange(of: library.rootCrates) { _, roots in
-                // First sync may land after onAppear.
-                model.pins.seedIfNeeded(candidates: library.seedCandidates(), oldDefault: roots)
+            .onChange(of: library.rootCrates) { _, _ in
+                seedPins() // first sync may land after onAppear
             }
         }
+    }
+
+    /// Seeding must wait for smart-crate definitions: without them the genre crates all look
+    /// empty and container fallbacks steal the seed slots permanently (seen live, 2026-07-10).
+    /// AppModel triggers the authoritative seed pass right after each sync's hydration.
+    private func seedPins() {
+        guard !library.smartQueriesPending else { return }
+        model.pins.seedIfNeeded(candidates: library.seedCandidates(),
+                                oldDefault: library.rootCrates)
     }
 
     // MARK: - Adaptive shelves (each renders only when non-empty — honest by construction)

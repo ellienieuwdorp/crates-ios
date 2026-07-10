@@ -149,6 +149,9 @@ final class AppModel {
         player.pruneDeletedTunes(valid: Set(result.snapshot.allTunes.map(\.id)))
         downloads.reconcileAll(tunesByCrate: result.snapshot.tunesByCrate)
         await library.hydrateSmartQueries() // smart-crate queries are live-only (backup strips them)
+        // The authoritative seed pass: candidates are only complete once smart queries hydrate
+        // (HomeView's own seeding defers while they're pending).
+        pins.seedIfNeeded(candidates: library.seedCandidates(), oldDefault: library.rootCrates)
         if !quiet { onboarding = .syncing("Done — \(result.snapshot.tuneCount) tunes", 1.0) }
     }
 
@@ -192,6 +195,7 @@ final class AppModel {
                 Task.detached { await ArtworkStore.shared.invalidate(coverIDs: changed) }
             }
             await library.hydrateSmartQueries()
+            pins.seedIfNeeded(candidates: library.seedCandidates(), oldDefault: library.rootCrates)
         } catch {
             if case CratesAPIError.http(400) = error {
                 // Server rejected the cursor — drop it; the next attempt reseeds via full sync.
