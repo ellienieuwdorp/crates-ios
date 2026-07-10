@@ -19,11 +19,24 @@ struct BrowseView: View {
         NavigationStack {
             List {
                 if trimmed.isEmpty {
-                    ForEach(library.rootCrates) { crate in
-                        NavigationLink { CrateDetailView(crate: crate) } label: {
-                            CrateRow(crate: crate)
+                    // Entity facets first (the desktop's Library-mode tabs, phone-shaped):
+                    // an A–Z artist list beats an 800-crate artist-folder tree on a phone.
+                    Section {
+                        NavigationLink { ArtistsListView() } label: {
+                            FacetEntryRow(title: "Artists", symbol: "music.mic")
                         }
-                        .pinContextMenu(crate: crate, pins: model.pins)
+                        NavigationLink { GenresListView() } label: {
+                            FacetEntryRow(title: "Genres", symbol: "tag")
+                        }
+                    }
+                    // Curated tree: no hidden crates, no verifiably dead roots (see design doc).
+                    Section("Crates") {
+                        ForEach(library.browseRoots) { crate in
+                            NavigationLink { CrateDetailView(crate: crate) } label: {
+                                CrateRow(crate: crate)
+                            }
+                            .pinContextMenu(crate: crate, pins: model.pins)
+                        }
                     }
                 } else {
                     ForEach(finderResults) { entry in
@@ -52,7 +65,7 @@ struct BrowseView: View {
             }
             .onAppear { library.refreshRoot() }
             .overlay {
-                if trimmed.isEmpty && library.rootCrates.isEmpty {
+                if trimmed.isEmpty && library.browseRoots.isEmpty {
                     emptyState.allowsHitTesting(false)
                 } else if !trimmed.isEmpty && finderResults.isEmpty {
                     ContentUnavailableView.search(text: trimmed).allowsHitTesting(false)
@@ -81,6 +94,99 @@ extension View {
                 }
             }
         }
+    }
+}
+
+struct FacetEntryRow: View {
+    let title: String
+    let symbol: String
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.title3).foregroundStyle(CratesColor.accent).frame(width: 30)
+            Text(title).font(.body)
+        }
+    }
+}
+
+/// A–Z artists with tune counts, deduped (the desktop's own shelves show duplicates; §e of the
+/// desktop-workflow report). Searchable because 1,700 artists is a list you navigate by typing.
+struct ArtistsListView: View {
+    @Environment(LibraryStore.self) private var library
+    @State private var query = ""
+
+    private var facets: [LibraryStore.Facet] {
+        let all = library.artistFacets()
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return all }
+        return all.filter { $0.name.localizedCaseInsensitiveContains(q) }
+    }
+
+    var body: some View {
+        List(facets) { facet in
+            NavigationLink {
+                FacetTunesView(title: facet.name, tunes: library.tunes(byArtist: facet.name))
+            } label: {
+                HStack {
+                    Text(facet.name).lineLimit(1)
+                    Spacer()
+                    Text("\(facet.tuneCount)")
+                        .font(.caption).foregroundStyle(CratesColor.textSecondary)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("Artists")
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $query, prompt: "Find an artist")
+    }
+}
+
+/// Genres by tune count — the corpus's real shape, not the crate tree's.
+struct GenresListView: View {
+    @Environment(LibraryStore.self) private var library
+
+    var body: some View {
+        List(library.genreFacets()) { facet in
+            NavigationLink {
+                FacetTunesView(title: facet.name, tunes: library.tunes(byGenre: facet.name))
+            } label: {
+                HStack {
+                    Text(facet.name).lineLimit(1)
+                    Spacer()
+                    Text("\(facet.tuneCount)")
+                        .font(.caption).foregroundStyle(CratesColor.textSecondary)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("Genres")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// A facet's tunes — same play/queue affordances as a crate list.
+struct FacetTunesView: View {
+    let title: String
+    let tunes: [Tune]
+    @Environment(PlaybackController.self) private var player
+    @Environment(DownloadManager.self) private var downloads
+
+    var body: some View {
+        List {
+            ForEach(Array(tunes.enumerated()), id: \.element.id) { index, tune in
+                TrackRow(
+                    tune: tune,
+                    isCurrent: player.current?.id == tune.id,
+                    isDownloaded: downloads.isDownloaded(tune.id)
+                ) {
+                    player.play(tunes, startingAt: index, context: title)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -120,6 +226,15 @@ struct CrateDetailView: View {
                         NavigationLink { CrateDetailView(crate: sub) } label: { CrateRow(crate: sub) }
                             .pinContextMenu(crate: sub, pins: model.pins)
                     }
+                }
+            }
+            if tunes.isEmpty && library.smartCrateUnsupported(crate) {
+                // Honest, not mysteriously empty: this smart crate's query is beyond the local
+                // evaluator (or not fetched yet) — it genuinely lives on the desktop.
+                Section {
+                    Label("This smart crate is computed on the desktop.", systemImage: "wand.and.stars")
+                        .font(.subheadline)
+                        .foregroundStyle(CratesColor.textSecondary)
                 }
             }
             Section(tunes.isEmpty ? "" : "\(tunes.count) Tunes") {

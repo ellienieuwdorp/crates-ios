@@ -16,12 +16,28 @@ final class HomePins {
         ids = (UserDefaults.standard.array(forKey: key) as? [NSNumber])?.map(\.int64Value) ?? []
     }
 
-    /// First-run defaults so Home is never empty: the top root crates. Runs once per mode —
-    /// a user who unpins everything gets an empty grid, not resurrected defaults.
-    func seedIfNeeded(with crates: [Crate]) {
-        guard ids.isEmpty, !crates.isEmpty, !UserDefaults.standard.bool(forKey: seededKey) else { return }
-        ids = crates.prefix(6).map(\.id)
+    private var seededV2Key: String { key + ".seeded.v2" }
+
+    /// First-run defaults so Home is never empty. Runs once per mode — a user who unpins
+    /// everything gets an empty grid, not resurrected defaults.
+    ///
+    /// v2 (2026-07-10, home-browse-redesign): candidates come from
+    /// `LibraryStore.seedCandidates()` (genre smart crates → Collection children → live roots)
+    /// instead of the first 6 roots — the old seed pinned Inbox/empty iTunes/hidden Archive,
+    /// the exact "tiles that don't exist" complaint. Migration: an existing pin set still
+    /// identical to the old default is replaced once; anything the user touched is kept.
+    func seedIfNeeded(candidates: [Crate], oldDefault: [Crate]) {
+        guard !UserDefaults.standard.bool(forKey: seededV2Key), !candidates.isEmpty else { return }
+        let untouchedV1 = !ids.isEmpty && Set(ids) == Set(oldDefault.prefix(6).map(\.id))
+        if ids.isEmpty {
+            guard !UserDefaults.standard.bool(forKey: seededKey) else { return } // deliberate empty grid
+        } else if !untouchedV1 {
+            UserDefaults.standard.set(true, forKey: seededV2Key) // customized — never touch
+            return
+        }
+        ids = candidates.map(\.id)
         UserDefaults.standard.set(true, forKey: seededKey)
+        UserDefaults.standard.set(true, forKey: seededV2Key)
         persist()
     }
 

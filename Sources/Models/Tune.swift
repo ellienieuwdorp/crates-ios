@@ -20,6 +20,10 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
     /// Whether the SERVER can stream this tune (an AudioFiles row with a codec exists).
     /// nil = unknown (stale pre-round-4 cache) — treat unknown as playable, never dim on a guess.
     var hasServerAudio: Bool?
+    /// All genre names from the Genres ⨝ TuneToGenres join (the `genre` string above is the
+    /// tune's single legacy tag). Powers smart-crate materialization and the genre facet.
+    /// Empty for pre-redesign caches until the next full sync.
+    var genres: [String] = []
 
     /// Honest playability: unplayable only when we know the server has no audio for it.
     /// (A local download would still play — callers overlay that separately.)
@@ -48,6 +52,7 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
         var rating: Int?; var coverID: Int64?; var dateAdded: Date?
         var source: TrackSource; var pageURL: String?
         var hasServerAudio: Bool? = nil // v1 caches lack it → decodes nil (unknown)
+        var genres: [String]? = nil     // pre-redesign caches lack it → decodes nil (empty)
     }
 
     init(from decoder: Decoder) throws {
@@ -58,6 +63,7 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
             key = cached.key; rating = cached.rating; coverID = cached.coverID
             dateAdded = cached.dateAdded; source = cached.source; pageURL = cached.pageURL
             hasServerAudio = cached.hasServerAudio
+            genres = cached.genres ?? []
             return
         }
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -80,6 +86,7 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
         let purchased = try c.decodeFlexibleInt(.purchasedFrom)
         source = Tune.sourceFromStoreID(purchased)
         hasServerAudio = nil // REST shape carries no AudioFiles join
+        genres = []          // REST shape carries no genre join either
     }
 
     func encode(to encoder: Encoder) throws {
@@ -88,7 +95,7 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
             id: id, title: title, artist: artist, album: album, genre: genre,
             lengthSeconds: lengthSeconds, bpm: bpm, key: key, rating: rating,
             coverID: coverID, dateAdded: dateAdded, source: source, pageURL: pageURL,
-            hasServerAudio: hasServerAudio))
+            hasServerAudio: hasServerAudio, genres: genres.isEmpty ? nil : genres))
     }
 
     /// Direct memberwise init for previews / tests / cache reconstruction.
@@ -96,11 +103,12 @@ struct Tune: Identifiable, Hashable, Sendable, Codable {
          genre: String? = nil, lengthSeconds: Double? = nil, bpm: String? = nil,
          key: String? = nil, rating: Int? = nil, coverID: Int64? = nil,
          dateAdded: Date? = nil, source: TrackSource = .unknown, pageURL: String? = nil,
-         hasServerAudio: Bool? = nil) {
+         hasServerAudio: Bool? = nil, genres: [String] = []) {
         self.id = id; self.title = title; self.artist = artist; self.album = album
         self.genre = genre; self.lengthSeconds = lengthSeconds; self.bpm = bpm; self.key = key
         self.rating = rating; self.coverID = coverID; self.dateAdded = dateAdded
         self.source = source; self.pageURL = pageURL; self.hasServerAudio = hasServerAudio
+        self.genres = genres
     }
 
     static func sourceFromStoreID(_ id: Int?) -> TrackSource {

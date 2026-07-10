@@ -43,6 +43,8 @@ enum BackupImporter {
         var audio: [Backup.AudioFileRow] = []
         var ratings: [Backup.RatingRow] = []
         var covers: [Backup.CoverRow] = []
+        var genres: [Backup.GenreRow] = []
+        var tuneGenres: [Backup.TuneToGenreRow] = []
     }
 
     /// Compatibility entry point: full import, raw caches discarded (existing tests + callers
@@ -67,7 +69,9 @@ enum BackupImporter {
                                      hierarchy: tables.hierarchy,
                                      membership: tables.membership,
                                      audio: Array(merged.audio.values),
-                                     ratings: tables.ratings)
+                                     ratings: tables.ratings,
+                                     genres: tables.genres,
+                                     tuneGenres: tables.tuneGenres)
 
         progress(.init(stage: "Done", fraction: 1.0))
         return MergeResult(snapshot: snapshot,
@@ -107,7 +111,9 @@ enum BackupImporter {
             membership: rows("CrateToTunes.json", Backup.CrateToTuneRow.self),
             audio: rows("AudioFiles.json", Backup.AudioFileRow.self),
             ratings: rows("Ratings.json", Backup.RatingRow.self),
-            covers: rows("Covers.json", Backup.CoverRow.self)
+            covers: rows("Covers.json", Backup.CoverRow.self),
+            genres: rows("Genres.json", Backup.GenreRow.self),
+            tuneGenres: rows("TuneToGenres.json", Backup.TuneToGenreRow.self)
         )
     }
 
@@ -151,12 +157,23 @@ enum BackupImporter {
                               hierarchy: [Backup.CrateToCrateRow],
                               membership: [Backup.CrateToTuneRow],
                               audio audioFiles: [Backup.AudioFileRow],
-                              ratings: [Backup.RatingRow]) -> LibrarySnapshot {
+                              ratings: [Backup.RatingRow],
+                              genres: [Backup.GenreRow] = [],
+                              tuneGenres: [Backup.TuneToGenreRow] = []) -> LibrarySnapshot {
         // Side tables keyed by tune.
         let audioByTune = Dictionary(audioFiles.compactMap { r in r.TuneID.map { ($0, r) } },
                                      uniquingKeysWith: { a, _ in a })
         let ratingByTune = Dictionary(ratings.compactMap { r in r.ObjectID.map { ($0, r.RatingValue) } },
                                       uniquingKeysWith: { a, _ in a })
+        // Genre names per tune (Genres ⨝ TuneToGenres) — smart crates + the genre facet.
+        let genreNameByID = Dictionary(genres.compactMap { r in
+            r.GenreID.flatMap { id in r.Name.map { (id, $0) } }
+        }, uniquingKeysWith: { a, _ in a })
+        var genresByTune: [Int64: [String]] = [:]
+        for r in tuneGenres {
+            guard let t = r.TuneID, let g = r.GenreID, let name = genreNameByID[g] else { continue }
+            genresByTune[t, default: []].append(name)
+        }
 
         // Enriched tunes by id.
         var tunesByID: [Int64: Tune] = [:]
@@ -180,7 +197,8 @@ enum BackupImporter {
                 pageURL: r.PageUrl,
                 // The server refuses to stream tunes without a codec ("Codec of the tune is
                 // null") — mark them so rows can be honest up front instead of tap → error.
-                hasServerAudio: audio?.Codec != nil
+                hasServerAudio: audio?.Codec != nil,
+                genres: genresByTune[r.TuneID] ?? []
             )
         }
 

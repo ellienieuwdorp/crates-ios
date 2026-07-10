@@ -117,6 +117,9 @@ final class PlaybackController {
     /// Which world the queue belongs to; nil disables persistence entirely (pre-bootstrap,
     /// hermetic UI tests). Set by AppModel.
     @ObservationIgnored var persistenceMode: PersistedQueue.Mode?
+    /// Fires when a track starts fresh (not on persistence-restore resume). AppModel wires this
+    /// to the local usage log; kept as a hook so the player stays library-agnostic.
+    @ObservationIgnored var onTrackStarted: ((Tune) -> Void)?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var lastSavedTime: Double = 0
     /// nonisolated: read from detached persistence tasks (precedent: AppModel.cursorKey).
@@ -474,6 +477,9 @@ final class PlaybackController {
         let tune = entries[index].tune
         currentTime = resumeTime
         duration = tune.lengthSeconds ?? 0
+        // Fresh starts only (resumeTime > 0 is a persistence restore of an already-counted
+        // play) — feeds the local usage log / Recently Played shelf.
+        if resumeTime == 0 { onTrackStarted?(tune) }
 
         if let url = resolvePlaybackURL(for: tune) {
             beginEngine(tune: tune, url: url, resumeTime: resumeTime, attachAuth: !url.isFileURL)

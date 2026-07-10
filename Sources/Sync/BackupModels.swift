@@ -64,6 +64,16 @@ enum Backup {
         let RatingValue: Int?
     }
 
+    struct GenreRow: Decodable {
+        let GenreID: Int64?
+        let Name: String?
+    }
+
+    struct TuneToGenreRow: Decodable {
+        let TuneID: Int64?
+        let GenreID: Int64?
+    }
+
     /// Only for the delta cursor (and future artwork-cache eviction) — Covers is the third
     /// lastSyncDate-filtered table.
     struct CoverRow: Decodable {

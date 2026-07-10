@@ -53,6 +53,7 @@ final class LibraryStore {
     /// (~2k tunes → a few ms, fine on the main actor).
     func setAllTunes(_ tunes: [Tune]) {
         allTunes = tunes
+        smartTunesCache = [:] // corpus changed → smart crates re-materialize lazily
         searchKeys = tunes.map {
             (all: Self.fold("\($0.title) \($0.artist) \($0.album)"),
              title: Self.fold($0.displayTitle),
@@ -166,6 +167,9 @@ final class LibraryStore {
                 tunesByCrate[id] = cached
                 ts = cached
             }
+            if (ts?.isEmpty ?? true), let crate = crateByID[id], crate.kind == .smart {
+                ts = materializedSmartTunes(for: crate) // backup ships no smart memberships
+            }
             for t in ts ?? [] where seenTunes.insert(t.id).inserted { result.append(t) }
             queue.append(contentsOf: (childrenByCrate[id] ?? []).map(\.id))
         }
@@ -272,9 +276,205 @@ final class LibraryStore {
         }
     }
 
-    func tunes(in crateID: Int64) -> [Tune] { tunesByCrate[crateID] ?? [] }
+    func tunes(in crateID: Int64) -> [Tune] {
+        // Smart crates ship ZERO memberships in the backup — materialize from their stored
+        // query instead (cached after first computation; invalidated on library reload).
+        if let cached = tunesByCrate[crateID], !cached.isEmpty { return cached }
+        if let crate = crateByID[crateID], crate.kind == .smart {
+            return materializedSmartTunes(for: crate)
+        }
+        return tunesByCrate[crateID] ?? []
+    }
     func children(of crateID: Int64) -> [Crate] { childrenByCrate[crateID] ?? [] }
     func state(for crateID: Int64) -> LoadState { crateState[crateID] ?? .idle }
+
+    // MARK: - Smart crates (client-side materialization; see docs/design/home-browse-redesign.md)
+
+    private var smartTunesCache: [Int64: [Tune]] = [:]
+
+    /// True when this smart crate has a query we can't evaluate locally — the UI shows an
+    /// honest "computed on the desktop" state instead of a silently-empty list.
+    func smartCrateUnsupported(_ crate: Crate) -> Bool {
+        guard crate.kind == .smart else { return false }
+        guard let q = crate.smartQuery, !q.isEmpty else { return true } // definition not fetched (offline before first sync)
+        return SmartQuery.parse(q) == nil
+    }
+
+    private func materializedSmartTunes(for crate: Crate) -> [Tune] {
+        if let hit = smartTunesCache[crate.id] { return hit }
+        guard let raw = crate.smartQuery, let query = SmartQuery.parse(raw) else { return [] }
+        // Newest first: a genre crate is a listening feed, and dateAdded is the only ordering
+        // the query itself doesn't define.
+        let result = allTunes.filter { query.matches($0) }
+            .sorted { ($0.dateAdded ?? .distantPast) > ($1.dateAdded ?? .distantPast) }
+        smartTunesCache[crate.id] = result
+        return result
+    }
+
+    /// Fetch smart-crate definitions (their stored queries) — live-only data the backup strips.
+    /// Runs after every sync; results are folded into the crate index and persisted with it.
+    func hydrateSmartQueries() async {
+        guard let api, !isDemoBacked else { return }
+        let smartIDs = crateIndex.filter { $0.crate.kind == .smart && $0.crate.smartQuery == nil }
+            .map(\.crate.id)
+        guard !smartIDs.isEmpty else { return }
+        var queries: [Int64: String] = [:]
+        for id in smartIDs {
+            guard let details = try? await api.crateDetails(id) else { continue }
+            queries[id] = details.smartQuery ?? "" // "" = fetched, has no query (still unsupported)
+        }
+        guard !queries.isEmpty else { return }
+        applySmartQueries(queries)
+        let index = crateIndex
+        Task.detached { await DiskCache.shared.save(index, key: "crate_index") }
+    }
+
+    /// Testable seam: fold fetched queries into every crate-bearing structure.
+    func applySmartQueries(_ queries: [Int64: String]) {
+        func patch(_ c: inout Crate) {
+            if let q = queries[c.id] { c.smartQuery = q }
+        }
+        var entries = crateIndex
+        for i in entries.indices { patch(&entries[i].crate) }
+        setCrateIndex(entries)
+        for i in rootCrates.indices { patch(&rootCrates[i]) }
+        for key in childrenByCrate.keys {
+            for i in (childrenByCrate[key] ?? []).indices { patch(&childrenByCrate[key]![i]) }
+        }
+        smartTunesCache = [:]
+    }
+
+    /// Test seam: install crates into the index (smart-crate materialization reads crateByID).
+    func applySmartQueriesForTesting(crates: [Crate]) {
+        setCrateIndex(crates.map { CrateIndexEntry(crate: $0, path: "") })
+        smartTunesCache = [:]
+    }
+
+    // MARK: - Curation (Home seeds, Browse roots) — the honesty rules
+
+    /// True when auto-surfacing this crate anywhere would be dishonest or useless: hidden,
+    /// system plumbing, the file mirror, or (for non-smart crates) verifiably empty.
+    private func isSurfaceable(_ crate: Crate) -> Bool {
+        if crate.isHidden || crate.isFolderMirror { return false }
+        if crate.kind == .playlist || crate.kind == .history || crate.kind == .search { return false }
+        if crate.kind == .smart { return !tunes(in: crate.id).isEmpty }
+        return (crate.tuneCount ?? 0) > 0 || crate.hasChildren
+    }
+
+    /// Home pin seeds, in priority order (see design doc): the user's own hand-built listening
+    /// taxonomy first (DJ Library's smart crates, only those that materialize non-empty), then
+    /// Collection's curated children, then surfaceable roots.
+    func seedCandidates(limit: Int = 6) -> [Crate] {
+        var out: [Crate] = []
+        var seen = Set<Int64>()
+        func add(_ crates: [Crate]) {
+            for c in crates where out.count < limit {
+                guard isSurfaceable(c), seen.insert(c.id).inserted else { continue }
+                out.append(c)
+            }
+        }
+        if let djLibrary = crateIndex.first(where: { $0.crate.kind == .root && $0.crate.name == "DJ Library" })?.crate {
+            add(children(of: djLibrary.id))
+        }
+        if let collection = rootOrChild(named: "Collection") {
+            add(children(of: collection.id))
+        }
+        add(rootCrates)
+        return out
+    }
+
+    private func rootOrChild(named name: String) -> Crate? {
+        crateIndex.first { $0.crate.name == name && $0.crate.kind == .root }?.crate
+    }
+
+    /// Browse's root list: the desktop's own signals, honored — no hidden crates, no verifiably
+    /// dead roots. (`Library` root keeps its place even with 0 direct tunes via hasChildren.)
+    var browseRoots: [Crate] {
+        rootCrates.filter { !$0.isHidden && (($0.tuneCount ?? 0) > 0 || $0.hasChildren) }
+    }
+
+    // MARK: - Facets (Artists / Genres) — derived from the synced corpus, deduped
+
+    struct Facet: Identifiable, Sendable, Equatable {
+        var name: String
+        var tuneCount: Int
+        var id: String { name.lowercased() }
+    }
+
+    /// A–Z artists with tune counts, case-insensitively deduped (first spelling wins — the
+    /// desktop's own Artists shelf shows literal duplicates; ours must not).
+    func artistFacets() -> [Facet] {
+        var counts: [String: (display: String, count: Int)] = [:]
+        for t in allTunes {
+            let display = t.displayArtist
+            let key = display.lowercased()
+            counts[key, default: (display, 0)].count += 1
+        }
+        return counts.values
+            .map { Facet(name: $0.display, tuneCount: $0.count) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Genres by tune count (desc) from the genre join + legacy tag, deduped like artists.
+    func genreFacets() -> [Facet] {
+        var counts: [String: (display: String, count: Int)] = [:]
+        for t in allTunes {
+            var names = t.genres
+            if names.isEmpty, let g = t.genre, !g.isEmpty { names = [g] }
+            var seen = Set<String>()
+            for n in names {
+                let key = n.lowercased()
+                guard seen.insert(key).inserted else { continue }
+                counts[key, default: (n, 0)].count += 1
+            }
+        }
+        return counts.values
+            .map { Facet(name: $0.display, tuneCount: $0.count) }
+            .sorted { $0.tuneCount != $1.tuneCount ? $0.tuneCount > $1.tuneCount
+                    : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    func tunes(byArtist name: String) -> [Tune] {
+        let key = name.lowercased()
+        return allTunes.filter { $0.displayArtist.lowercased() == key }
+    }
+
+    func tunes(byGenre name: String) -> [Tune] {
+        let key = name.lowercased()
+        return allTunes.filter { t in
+            t.genres.contains { $0.lowercased() == key } || t.genre?.lowercased() == key
+        }
+    }
+
+    // MARK: - Home shelves (each renders ONLY when non-empty — the honesty rule)
+
+    /// Playable-now filter for listening shelves: server audio, or a Bandcamp page we can
+    /// preview. Unknown (nil) stays in — never hide on a guess.
+    private func shelfPlayable(_ t: Tune) -> Bool {
+        !t.knownUnstreamable || (t.source == .bandcamp && t.pageURL != nil)
+    }
+
+    /// "What's new since I synced": newest first by dateAdded.
+    func recentlyAddedTunes(limit: Int = 20) -> [Tune] {
+        allTunes.filter { shelfPlayable($0) && $0.dateAdded != nil }
+            .sorted { $0.dateAdded! > $1.dateAdded! }
+            .prefix(limit).map { $0 }
+    }
+
+    /// The desktop's best idea, stolen: rated tunes you haven't played on THIS device recently,
+    /// best-rated first. `recentlyPlayedIDs` comes from the local usage log.
+    func forgottenFavorites(excluding recentlyPlayedIDs: Set<Int64>, limit: Int = 20) -> [Tune] {
+        allTunes.filter { shelfPlayable($0) && ($0.rating ?? 0) > 0 && !recentlyPlayedIDs.contains($0.id) }
+            .sorted { ($0.rating ?? 0) != ($1.rating ?? 0) ? ($0.rating ?? 0) > ($1.rating ?? 0)
+                    : ($0.dateAdded ?? .distantPast) < ($1.dateAdded ?? .distantPast) }
+            .prefix(limit).map { $0 }
+    }
+
+    /// Tunes for the local recently-played shelf, newest first, in log order.
+    func tunes(byIDs ids: [Int64]) -> [Tune] {
+        let byID = Dictionary(allTunes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        return ids.compactMap { byID[$0] }
+    }
 
     /// Open a crate: serve cached tunes immediately (caller reads `tunes(in:)`), revalidate behind.
     @discardableResult

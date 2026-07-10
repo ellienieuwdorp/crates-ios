@@ -58,6 +58,7 @@ final class AppModel {
         downloads.attach(client: client, connection: connection)
         player.attach(connection: connection, downloads: downloads)
         downloads.nowPlayingTuneID = { [weak player] in player?.current?.id }
+        player.onTrackStarted = { [weak self] tune in self?.usage.recordTunePlay(tune.id) }
         let conn = connection
         Task { await ArtworkStore.shared.update(connection: conn) }
     }
@@ -147,6 +148,7 @@ final class AppModel {
         UserDefaults.standard.set(Date(), forKey: AppModel.lastSyncKey)
         player.pruneDeletedTunes(valid: Set(result.snapshot.allTunes.map(\.id)))
         downloads.reconcileAll(tunesByCrate: result.snapshot.tunesByCrate)
+        await library.hydrateSmartQueries() // smart-crate queries are live-only (backup strips them)
         if !quiet { onboarding = .syncing("Done — \(result.snapshot.tuneCount) tunes", 1.0) }
     }
 
@@ -189,6 +191,7 @@ final class AppModel {
                 let changed = result.changedCoverIDs
                 Task.detached { await ArtworkStore.shared.invalidate(coverIDs: changed) }
             }
+            await library.hydrateSmartQueries()
         } catch {
             if case CratesAPIError.http(400) = error {
                 // Server rejected the cursor — drop it; the next attempt reseeds via full sync.

@@ -28,6 +28,14 @@ struct LibraryAPI {
         try await client.get("tunes/crates/\(crateID)", as: [Tune].self)
     }
 
+    /// A crate's full bean — the only place a smart crate's stored query
+    /// (`crateTypeProperties`) is available; the backup export strips it. (Verified live
+    /// 2026-07-10: `GET /crates/{id}/contents` → `{crate: {..., crateTypeProperties}}`.)
+    func crateDetails(_ crateID: Int64) async throws -> Crate {
+        struct Envelope: Decodable { let crate: Crate }
+        return try await client.get("crates/\(crateID)/contents", as: Envelope.self).crate
+    }
+
     // Remote search removed (dogfood round 3, item 8): /search/tunes/basic is deprecated,
     // Lucene-backed (bare substrings match nothing), and the whole library is local anyway —
     // LibraryStore.searchTunes is the search path.

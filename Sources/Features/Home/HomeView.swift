@@ -15,6 +15,7 @@ struct HomeView: View {
             GeometryReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
+                        shelves
                         header
                         recentsRow
                         hotlinks
@@ -40,12 +41,29 @@ struct HomeView: View {
             }
             .onAppear {
                 library.refreshRoot()
-                model.pins.seedIfNeeded(with: library.rootCrates)
+                model.pins.seedIfNeeded(candidates: library.seedCandidates(),
+                                        oldDefault: library.rootCrates)
             }
             .onChange(of: library.rootCrates) { _, roots in
-                model.pins.seedIfNeeded(with: roots) // first sync may land after onAppear
+                // First sync may land after onAppear.
+                model.pins.seedIfNeeded(candidates: library.seedCandidates(), oldDefault: roots)
             }
         }
+    }
+
+    // MARK: - Adaptive shelves (each renders only when non-empty — honest by construction)
+
+    /// The adaptive zone above the stable pin grid: what you played, what arrived, what you
+    /// forgot. Bottom-anchored layout keeps pins at the thumb; shelves grow upward into the
+    /// previously-empty top half and are reached by the natural scroll-up.
+    @ViewBuilder private var shelves: some View {
+        let played = library.tunes(byIDs: model.usage.recentTuneIDs())
+        let added = library.recentlyAddedTunes()
+        let forgotten = library.forgottenFavorites(
+            excluding: model.usage.tuneIDsPlayed(withinDays: 30))
+        TuneShelf(title: "Recently Played", tunes: played)
+        TuneShelf(title: "Recently Added", tunes: added)
+        TuneShelf(title: "Forgotten Favorites", tunes: forgotten)
     }
 
     private var header: some View {
@@ -117,6 +135,82 @@ struct HomeView: View {
                 }
             }
         }
+    }
+}
+
+/// A horizontal tune carousel (Home's adaptive shelves). Renders NOTHING when empty — the
+/// desktop ships three dead sections with joke copy; our honesty rule forbids the pattern.
+/// Tapping a card plays the shelf from that tune (the shelf is the queue context); context
+/// menu queues without interrupting.
+struct TuneShelf: View {
+    let title: String
+    let tunes: [Tune]
+    @Environment(PlaybackController.self) private var player
+
+    var body: some View {
+        if !tunes.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title)
+                    .font(.headline)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ForEach(Array(tunes.enumerated()), id: \.element.id) { index, tune in
+                            TuneCard(tune: tune, isCurrent: player.current?.id == tune.id) {
+                                player.play(tunes, startingAt: index, context: title)
+                            }
+                            .contextMenu {
+                                Button { player.playNext(tune) } label: {
+                                    Label("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward")
+                                }
+                                Button { player.addToEndOfQueue(tune) } label: {
+                                    Label("Add to Queue", systemImage: "text.append")
+                                }
+                            }
+                        }
+                    }
+                }
+                .scrollClipDisabled()
+            }
+        }
+    }
+}
+
+/// Cover-led tune card: the artwork is the tile (same content-first language as CrateTile),
+/// title + artist as a quiet text stack. Current track gets the teal ring, never orange.
+struct TuneCard: View {
+    let tune: Tune
+    let isCurrent: Bool
+    let action: () -> Void
+    private static let side: CGFloat = 132
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                ZStack {
+                    Rectangle().fill(CratesColor.surface)
+                    CoverImage(coverID: tune.coverID ?? 0)
+                }
+                .frame(width: Self.side, height: Self.side)
+                .clipShape(.rect(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(isCurrent ? CratesColor.accent : .primary.opacity(0.08),
+                                      lineWidth: isCurrent ? 2 : 0.5)
+                )
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(tune.displayTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(tune.displayArtist)
+                        .font(.caption)
+                        .foregroundStyle(CratesColor.textSecondary)
+                        .lineLimit(1)
+                }
+                .frame(width: Self.side, alignment: .leading)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -12,16 +12,52 @@ struct CrateUsage: Codable, Sendable {
     var lastTouched: Date { max(lastOpened ?? .distantPast, lastPlayed ?? .distantPast) }
 }
 
+/// One tune-level play event (newest kept first in the log).
+struct TunePlay: Codable, Sendable, Equatable {
+    var tuneID: Int64
+    var playedAt: Date
+}
+
 @MainActor
 @Observable
 final class UsageLog {
     private(set) var byCrate: [Int64: CrateUsage] = [:]
+    /// Tune-level plays, newest first, deduped by tune (a tune moves to the front on replay).
+    /// This is the phone's truthful "Recently Played" — local by design; the desktop's
+    /// crate-level equivalent provably surfaces junk (see desktop-workflow report).
+    private(set) var recentTunes: [TunePlay] = []
+    private static let recentTunesCap = 50
 
     func hydrate() async {
         if byCrate.isEmpty,
            let cached: [Int64: CrateUsage] = await DiskCache.shared.load("usage_log_v1", as: [Int64: CrateUsage].self) {
             byCrate = cached
         }
+        if recentTunes.isEmpty,
+           let cached: [TunePlay] = await DiskCache.shared.load("recent_tunes_v1", as: [TunePlay].self) {
+            recentTunes = cached
+        }
+    }
+
+    func recordTunePlay(_ tuneID: Int64) {
+        recentTunes.removeAll { $0.tuneID == tuneID }
+        recentTunes.insert(TunePlay(tuneID: tuneID, playedAt: Date()), at: 0)
+        if recentTunes.count > Self.recentTunesCap {
+            recentTunes.removeLast(recentTunes.count - Self.recentTunesCap)
+        }
+        let snapshot = recentTunes
+        Task.detached { await DiskCache.shared.save(snapshot, key: "recent_tunes_v1") }
+    }
+
+    /// Newest-first tune ids for the Home shelf.
+    func recentTuneIDs(limit: Int = 20) -> [Int64] {
+        recentTunes.prefix(limit).map(\.tuneID)
+    }
+
+    /// Tunes played on this device within `days` — the "don't call it forgotten" exclusion set.
+    func tuneIDsPlayed(withinDays days: Int) -> Set<Int64> {
+        let cutoff = Date().addingTimeInterval(-Double(days) * 24 * 3600)
+        return Set(recentTunes.lazy.filter { $0.playedAt > cutoff }.map(\.tuneID))
     }
 
     func recordOpen(_ crateID: Int64) {
