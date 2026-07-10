@@ -1,7 +1,8 @@
 import Foundation
 
 /// Immutable description of how to reach a Crates server: base URL + the bearer token obtained
-/// through pairing. Persisted (token in Keychain in a real build; UserDefaults here for the POC).
+/// through pairing. Persisted with the non-secret host/port in UserDefaults and the token in the
+/// Keychain (split + reassembled in `AppModel`); the in-memory value always carries both.
 struct CratesConnection: Sendable, Equatable, Codable {
     /// e.g. http://192.168.1.42:54735
     var host: String

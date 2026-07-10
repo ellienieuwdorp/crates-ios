@@ -13,6 +13,10 @@ packages:
 
 settings:
   base:
+    # Make Xcode's built-in default explicit: some toolchains stop applying it, leaving an empty
+    # PRODUCT_NAME → a "…/.app" wrapper and a "Multiple commands produce '.app'" build failure.
+    # Resolves per target ($(TARGET_NAME)), so packages/tests keep their own names.
+    PRODUCT_NAME: "$(TARGET_NAME)"
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "0.2.0"
@@ -26,6 +30,26 @@ settings:
     # Automatic signing with Ellie's team so builds work on device + simulator.
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: C8N8X74Y27
+  configs:
+    Debug:
+      # Standard Debug defaults made explicit: some toolchains don't auto-apply the config-name
+      # defaults. Without them ONLY_ACTIVE_ARCH=NO pulls a second (x86_64) slice into the
+      # concrete-simulator `test` build (which then fails to link the SPM packages), and
+      # ENABLE_TESTABILITY=NO builds CratesIOS without `-enable-testing`, so the unit tests'
+      # `@testable import CratesIOS` can't resolve a compatible module; and the missing `-Onone`
+      # default optimizes the app, inlining/stripping symbols (e.g. KeychainStore) that
+      # `@testable` linking then can't find.
+      ONLY_ACTIVE_ARCH: YES
+      ENABLE_TESTABILITY: YES
+      SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+      GCC_OPTIMIZATION_LEVEL: "0"
+      DEAD_CODE_STRIPPING: NO
+      COPY_PHASE_STRIP: NO
+      # The Xcode 16 debug-dylib splits the app into a tiny launcher stub + a `.debug.dylib`
+      # holding the real symbols. Hosted unit tests then link against the stub with no
+      # `-bundle_loader` to the dylib, so every `@testable` symbol goes undefined. Build the app
+      # as a single binary so the test host resolves against it normally.
+      ENABLE_DEBUG_DYLIB: NO
 
 targets:
   CratesIOS:
@@ -87,6 +111,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: co.crates.ios.tests
         GENERATE_INFOPLIST_FILE: YES
+        # xcodegen sets TEST_HOST but relies on Xcode defaulting BUNDLE_LOADER = $(TEST_HOST).
+        # This toolchain doesn't apply that default, so the test link gets no `-bundle_loader`
+        # and every `@testable import CratesIOS` symbol goes undefined. Wire it explicitly.
+        BUNDLE_LOADER: "$(TEST_HOST)"
 
   CratesUITests:
     type: bundle.ui-testing
@@ -100,3 +128,18 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: co.crates.ios.uitests
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: CratesIOS
+
+# Explicit scheme so `test` always runs both bundles. The auto-generated scheme on this
+# toolchain wired only the UI-test target into its test action, silently skipping the unit tests.
+schemes:
+  CratesIOS:
+    build:
+      targets:
+        CratesIOS: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CratesTests
+        - CratesUITests
