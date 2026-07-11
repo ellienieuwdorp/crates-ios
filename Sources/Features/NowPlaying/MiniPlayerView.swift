@@ -44,8 +44,13 @@ struct MiniPlayerView: View {
                         Label("Can't play — tap for details", systemImage: "exclamationmark.triangle.fill")
                             .font(.footnote).foregroundStyle(CratesColor.red).lineLimit(1)
                     } else {
+                        // Explicit token, NOT hierarchical .secondary: this was the pill's only
+                        // vibrancy-resolved text, and after a zoom-dismissal the glass accessory's
+                        // vibrancy backdrop re-composites late on device (iOS 27 beta) — the
+                        // artist line visibly lagged the title/buttons, which all use explicit
+                        // styles (round-5 wave-2 #1). Token matches TrackRow + the idle state.
                         Text(tune.displayArtist)
-                            .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                            .font(.footnote).foregroundStyle(CratesColor.textSecondary).lineLimit(1)
                     }
                 }
                 Spacer(minLength: 8)
