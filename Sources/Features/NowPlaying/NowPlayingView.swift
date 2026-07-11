@@ -1,5 +1,73 @@
 import SwiftUI
 
+/// Diagnostic tap for the queue-morph geometry (round-5 wave-2 jolt hunt). Inert unless the
+/// app is launched with `-morphLog`; then every sheet-geometry callback and every anchor/
+/// detent mutation appends a timestamped line to Documents/morph-log.txt, so a post-settle
+/// height reversal shows up as hard evidence in the log tail.
+@MainActor enum MorphLog {
+    static let enabled = ProcessInfo.processInfo.arguments.contains("-morphLog")
+    private static var handle: FileHandle? = {
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("morph-log.txt")
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        return try? FileHandle(forWritingTo: url)
+    }()
+
+    static func log(_ message: @autoclosure () -> String) {
+        guard enabled, let handle else { return }
+        let line = String(format: "%.3f %@\n", ProcessInfo.processInfo.systemUptime, message())
+        try? handle.write(contentsOf: Data(line.utf8))
+    }
+}
+
+/// `-morphLog` companion: a CADisplayLink that logs the sheet's PRESENTATION-layer origin
+/// every display tick. The SwiftUI-side geometry callbacks coalesce animated changes to a
+/// single model value, so only the render server's view of the sheet can show whether the
+/// on-screen surface actually reverses direction after a settle (the reported jolt).
+private struct SheetMotionProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> ProbeView { ProbeView() }
+    func updateUIView(_ uiView: ProbeView, context: Context) {}
+
+    @MainActor final class ProbeView: UIView {
+        private var link: CADisplayLink?
+        private var last: [Int: CGRect] = [:]
+        private var dumpedChain = false
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            link?.invalidate()
+            link = nil
+            guard window != nil else { return }
+            let l = CADisplayLink(target: self, selector: #selector(tick))
+            l.add(to: .main, forMode: .common)
+            link = l
+        }
+
+        @objc private func tick() {
+            var chain: [UIView] = []
+            var v: UIView? = superview
+            while let cur = v { chain.append(cur); v = cur.superview }
+            if !dumpedChain {
+                dumpedChain = true
+                for (i, view) in chain.enumerated() {
+                    MorphLog.log("chain[\(i)] \(String(describing: type(of: view)))")
+                }
+            }
+            for (i, view) in chain.enumerated() {
+                guard let pres = view.layer.presentation() else { continue }
+                // Presentation frame (superlayer coords): whichever ancestor UIKit actually
+                // moves shows the motion in its own local frame — enough to spot a reversal.
+                let f = pres.frame
+                let prev = last[i] ?? .null
+                guard abs(f.origin.y - prev.origin.y) > 0.05
+                    || abs(f.height - prev.height) > 0.05 else { continue }
+                last[i] = f
+                MorphLog.log("visual[\(i)] y=\(f.origin.y) h=\(f.height)")
+            }
+        }
+    }
+}
+
 /// Full-screen player (Idea #4 v3 — see docs/design/now-playing-redesign.md). Two in-place
 /// states on a two-detent sheet, no popups:
 ///
@@ -73,8 +141,9 @@ struct NowPlayingView: View {
     private var morphProgress: CGFloat {
         let floor = collapsedHeight + (collapsedChrome ?? 0)
         // 175: measured .large-vs-collapsed content span on iPhone 17 Pro — only the very
-        // first drag of a launch ever uses it; the first settle captures the true value
-        // (with animation, so even a seed miss glides instead of snapping).
+        // first drag of a launch ever uses it; the first expanded geometry callback captures
+        // the true value inline (riding that callback's own transaction, so a seed miss still
+        // glides — calibration never starts an animation of its own).
         let ceiling = expandedSheetHeight ?? SheetAnchorCache.expandedHeight ?? (floor + 175)
         guard ceiling - floor > 1 else { return queueExpanded ? 1 : 0 }
         return min(1, max(0, (sheetHeight - floor) / (ceiling - floor)))
@@ -98,6 +167,7 @@ struct NowPlayingView: View {
             get: { queueExpanded ? .large : collapsedDetent },
             set: { newValue in
                 // Fires once when a user drag settles — animate our content morph in sync.
+                MorphLog.log("detentSettle large=\(newValue == .large)")
                 withAnimation(.snappy(duration: 0.35)) {
                     queueExpanded = (newValue == .large)
                     if !queueExpanded { editMode = .inactive } // drag-collapse must exit edit like tap-collapse
@@ -127,6 +197,7 @@ struct NowPlayingView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: transportPulse)
         .sensoryFeedback(.selection, trigger: modePulse)
         .sensoryFeedback(.impact(weight: .light), trigger: queuePulse)
+        .background { if MorphLog.enabled { SheetMotionProbe() } }
     }
 
     /// Feeds the morph driver from the sheet root's live size and captures the two height
@@ -140,7 +211,19 @@ struct NowPlayingView: View {
             expandedSheetHeight = nil
             SheetAnchorCache.expandedHeight = nil
         }
+        MorphLog.log("sheet h=\(size.height) progress=\(morphProgress)")
         sheetHeight = size.height
+        // Expanded anchor, captured inline: while `queueExpanded` the model height is the
+        // settled `.large` value (tap changes coalesce to it instantly; a collapse drag only
+        // goes below it, and the max-ratchet rejects that). No withAnimation — if this
+        // callback rides an animated transaction (the tap-expand resize), the fades that key
+        // off morphProgress glide with that same transaction; calibration itself must never
+        // START an animation (round-5 wave-2: post-settle animated corrections ARE the jolt).
+        if queueExpanded, size.height > (expandedSheetHeight ?? 0) {
+            MorphLog.log("anchor inline expandedSheetHeight=\(size.height)")
+            expandedSheetHeight = size.height
+            SheetAnchorCache.expandedHeight = size.height
+        }
         scheduleAnchorCapture()
     }
 
@@ -152,20 +235,30 @@ struct NowPlayingView: View {
         anchorSettleTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
-            // Corrections animate: if the pre-capture estimate was off, the fades glide to
-            // their true endpoint instead of snapping (matters on the first-ever drag).
+            // THE STEADY-STATE RULE (round-5 wave-2, Ellie's "extra up-down jolt"): once a
+            // detent has settled, nothing here may start a layout-affecting animation.
+            // Calibration values feed only the progress mapping for FUTURE drags — they apply
+            // bare, with no transaction. The one thing that may still move layout is a real
+            // content-height change (parked below), and only when it actually differs.
             if queueExpanded {
                 let anchored = max(expandedSheetHeight ?? 0, sheetHeight)
-                withAnimation(.snappy(duration: 0.35)) { expandedSheetHeight = anchored }
+                MorphLog.log("anchor expandedSheetHeight=\(anchored) (was \(String(describing: expandedSheetHeight)))")
+                expandedSheetHeight = anchored
                 SheetAnchorCache.expandedHeight = anchored
             } else if let pending = pendingCollapsedHeight {
-                // A parked mid-morph measurement outranks anchor capture: apply it, let the
-                // sheet resize to the true content, and anchor on the rest that follows.
+                // A measurement parked mid-morph: honor it at rest — but only if the content
+                // is genuinely different from the current detent. After a plain collapse the
+                // remeasure lands back on the same height, and re-applying it would animate
+                // the ACTIVE detent right after the settle (the drag-path jolt).
                 pendingCollapsedHeight = nil
-                withAnimation(.snappy(duration: 0.3)) { collapsedHeight = pending }
+                if abs(pending - collapsedHeight) >= 1 {
+                    MorphLog.log("anchor applyPendingCollapsed=\(pending) (collapsedHeight was \(collapsedHeight))")
+                    withAnimation(.smooth(duration: 0.3)) { collapsedHeight = pending }
+                }
             } else if sheetHeight > 0 {
                 let chrome = min(collapsedChrome ?? .infinity, sheetHeight - collapsedHeight)
-                withAnimation(.snappy(duration: 0.35)) { collapsedChrome = chrome }
+                MorphLog.log("anchor chrome=\(chrome) (was \(String(describing: collapsedChrome)))")
+                collapsedChrome = chrome
             }
         }
     }
@@ -205,12 +298,26 @@ struct NowPlayingView: View {
                     guard !queueExpanded, !layoutExpanded else { return }
                     let measured = height.rounded(.up)
                     guard abs(measured - collapsedHeight) >= 1 else { return } // ignore float jitter
-                    if morphProgress < 0.02 {
-                        // Animate so content growth (title wrap, error line) resizes the sheet
-                        // smoothly instead of snapping a frame later.
-                        withAnimation(.snappy(duration: 0.3)) { collapsedHeight = measured }
+                    if collapsedChrome == nil {
+                        // Presentation phase: no rest has calibrated the anchors yet, so this
+                        // is the seed being corrected while the open animation is still in
+                        // flight. Fold it into that animation by re-targeting the detent NOW,
+                        // with no transaction of our own — deferring it used to bump the sheet
+                        // a beat AFTER the open settled (round-5 wave-2 item 2, the every-open
+                        // jolt: the @State seed dies with each presentation, so every open
+                        // measured ~605 against the 560 seed and animated the late correction).
+                        MorphLog.log("measure applyCollapsedPresenting=\(measured) (was \(collapsedHeight))")
+                        collapsedHeight = measured
+                    } else if morphProgress < 0.02 {
+                        // Settled collapsed rest: genuine content growth (title wrap, error
+                        // line appearing). The one legitimate post-settle layout move —
+                        // smooth, so a real change glides without a bounce.
+                        MorphLog.log("measure applyCollapsed=\(measured) (was \(collapsedHeight))")
+                        withAnimation(.smooth(duration: 0.3)) { collapsedHeight = measured }
                     } else {
-                        // Mid-morph: park it — scheduleAnchorCapture applies it at rest.
+                        // Mid-morph: park it — scheduleAnchorCapture applies it at rest, and
+                        // only if it still differs from the detent by then.
+                        MorphLog.log("measure parkCollapsed=\(measured) progress=\(morphProgress)")
                         pendingCollapsedHeight = measured
                     }
                 }
@@ -234,6 +341,7 @@ struct NowPlayingView: View {
                             .padding(.trailing, inset)
                             .padding(.bottom, 12)
                             .accessibilityLabel("Collapse queue")
+                            .accessibilityIdentifier("queueCollapseChevron")
                         }
                     }
             }
@@ -425,6 +533,12 @@ struct NowPlayingView: View {
     /// a near-miss can't hit a different control (Edit lives in the queue's section header).
     /// Tap toggles; the system sheet drag between detents is the swipe gesture (a custom
     /// DragGesture would fight it).
+    ///
+    /// Hit-testing is asymmetric on purpose (round-5 wave-2 item 4): while COLLAPSED the whole
+    /// row expands the queue (a generous target for a small pill), but while EXPANDED only the
+    /// pill itself collapses — the full-width rect used to sit exactly where a finger reaches
+    /// for the queue header, so a missed Edit tap instantly hid the list being edited. Blank
+    /// space never collapses; collapse stays on the pill, the floating chevron, and the drag.
     private var queueHandle: some View {
         HStack(spacing: 8) {
             Image(systemName: "chevron.compact.up")
@@ -436,9 +550,12 @@ struct NowPlayingView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
         .glassEffect(.regular.interactive(), in: .capsule)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .contentShape(.rect)
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(.rect) // the pill's own ≥44pt target — the inner gesture wins over the row's
         .onTapGesture { setQueue(expanded: !queueExpanded) }
+        .frame(maxWidth: .infinity)
+        .contentShape(.rect)
+        .onTapGesture { if !queueExpanded { setQueue(expanded: true) } } // blank space: expand-only
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(queueExpanded ? "Collapse queue" : "Expand queue")
@@ -484,7 +601,9 @@ struct NowPlayingView: View {
     }
 
     /// Section header row: title leading, Edit/Done trailing (classic iOS grammar — the Edit
-    /// control lives with the list it edits, not inside the drag pill's tap area).
+    /// control lives with the list it edits, not inside the drag pill's tap area). The button
+    /// is a real labeled control with a ≥44pt hit target (round-5 wave-2 item 4: the old
+    /// footnote-sized text was easy to miss, and missing it used to collapse the queue).
     private func sectionHeader(_ title: String, showsEdit: Bool = false) -> some View {
         HStack {
             Text(title)
@@ -492,15 +611,21 @@ struct NowPlayingView: View {
                 .foregroundStyle(CratesColor.textSecondary)
             Spacer()
             if showsEdit {
-                Button(editMode == .active ? "Done" : "Edit") {
+                Button {
                     withAnimation { editMode = editMode == .active ? .inactive : .active }
+                } label: {
+                    Text(editMode == .active ? "Done" : "Edit")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                        .contentShape(.rect)
                 }
-                .font(.footnote.weight(.semibold))
-                .tint(CratesColor.accent)
+                .buttonStyle(.plain)
+                .foregroundStyle(CratesColor.accent)
+                .accessibilityIdentifier("queueEdit")
             }
         }
         .textCase(nil)
-        .listRowInsets(.init(top: 0, leading: inset, bottom: 4, trailing: inset))
+        .listRowInsets(.init(top: 0, leading: inset, bottom: showsEdit ? 0 : 4, trailing: inset))
     }
 
     private func queueRows(_ block: [QueueEntry], baseIndex: Int, isLastSection: Bool) -> some View {
@@ -535,6 +660,7 @@ struct NowPlayingView: View {
     }
 
     private func setQueue(expanded: Bool) {
+        MorphLog.log("setQueue expanded=\(expanded)")
         withAnimation(.snappy(duration: 0.35)) {
             queueExpanded = expanded
             if !expanded { editMode = .inactive }
