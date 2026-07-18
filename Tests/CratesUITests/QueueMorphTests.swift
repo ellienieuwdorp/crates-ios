@@ -1,6 +1,6 @@
 import XCTest
 
-/// Verification harness for the Now Playing queue morph (Ellie, 2026-07-10: the queue faded
+/// Verification harness for the Now Playing queue morph (device finding: the queue faded
 /// on its own curve, separate from the player — the morph must track the drag as ONE surface).
 ///
 /// The mid-gesture *visual* proof is captured from OUTSIDE the process (`xcrun simctl io

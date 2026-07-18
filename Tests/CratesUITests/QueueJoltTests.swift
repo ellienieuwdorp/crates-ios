@@ -1,6 +1,6 @@
 import XCTest
 
-/// Round-5 wave-2 defect A (Ellie, on device): expanding the player via the queue pill lands,
+/// Round-5 wave-2 defect A (observed on device): expanding the player via the queue pill lands,
 /// then does an extra up-down jolt before settling; sometimes also on drag expand/collapse.
 ///
 /// Like QueueMorphTests, the *visual* proof is captured from outside the process (screenshot

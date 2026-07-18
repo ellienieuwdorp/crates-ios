@@ -1,6 +1,6 @@
 import XCTest
 
-/// Round-5 wave-2 defect B (Ellie, on device): the queue's Edit affordance was a tiny
+/// Round-5 wave-2 defect B (observed on device): the queue's Edit affordance was a tiny
 /// footnote-sized text, and the full-width tap target of the queue pill's row meant a missed
 /// Edit tap on the blank space just above the queue collapsed the very list being edited.
 ///

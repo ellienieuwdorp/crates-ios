@@ -29,9 +29,8 @@ settings:
     # the simulator (which always replaces) got new ones.
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     GENERATE_INFOPLIST_FILE: YES
-    # Automatic signing with Ellie's team so builds work on device + simulator.
+    # Automatic signing; select your own development team for device builds.
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: C8N8X74Y27
   configs:
     Debug:
       # Standard Debug defaults made explicit: some toolchains don't auto-apply the config-name

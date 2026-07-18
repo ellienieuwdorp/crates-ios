@@ -65,7 +65,7 @@ struct RootView: View {
 enum AppTab: Hashable { case home, browse, search }
 
 extension View {
-    /// iOS 27 (beta, on Ellie's phone) stopped propagating the tabViewBottomAccessory height
+    /// iOS 27 beta device testing stopped propagating the tabViewBottomAccessory height
     /// into the bottom safe area, so scroll content hides under the mini player pill — iOS 26
     /// insets correctly, which is why the simulator never showed the overlap. Explicit bottom
     /// clearance for every scrollable in the tab, gated to 27+ so 26 doesn't double-inset.

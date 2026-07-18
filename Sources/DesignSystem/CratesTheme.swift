@@ -7,13 +7,13 @@ import SwiftUI
 ///                                  The desktop's brand-primary; what users tap.
 ///   • `playback` ORANGE #D88810 — reserved for the waveform scrubber (matching the desktop,
 ///                                  which keeps orange for the waveform only). NOT for controls —
-///                                  orange-tinted buttons read off-brand (Ellie, 2026-07-04).
+///                                  orange-tinted buttons read off-brand in device testing.
 ///   • `green`           #089848 — settled success (downloaded, cache up-to-date).
 ///   • `red`             danger.
 ///
 /// Surfaces are a warm near-black charcoal in dark (#141412 / #201F1B — matching the desktop) and
 /// neutral in light (#FFFFFF background / #F2F2F7 tiles — the original warm "paper" light mode
-/// read as an off-brand orange tint next to system-white lists; Ellie, 2026-07-04). Accents are
+/// read as an off-brand orange tint next to system-white lists in device testing. Accents are
 /// brightened in dark mode so text/icons clear WCAG AA on charcoal. The app supports both
 /// schemes; dark is the signature Crates look.
 enum CratesColor {

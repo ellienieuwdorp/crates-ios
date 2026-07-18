@@ -92,7 +92,7 @@ struct NowPlayingView: View {
     /// with a realistic value so the first frame doesn't flash a sliver-height sheet.
     @State private var collapsedHeight: CGFloat = 560
 
-    // MARK: Continuous morph driver (Ellie, 2026-07-10: queue faded on its own curve)
+    // MARK: Continuous morph driver (device testing: queue faded on its own curve)
     //
     // The sheet's content height changes LIVE while a detent drag is in flight, but
     // `queueExpanded` only flips when the drag settles — anything keyed to the boolean
@@ -235,7 +235,7 @@ struct NowPlayingView: View {
         anchorSettleTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
-            // THE STEADY-STATE RULE (round-5 wave-2, Ellie's "extra up-down jolt"): once a
+            // THE STEADY-STATE RULE (round-5 wave-2, the observed "extra up-down jolt"): once a
             // detent has settled, nothing here may start a layout-affecting animation.
             // Calibration values feed only the progress mapping for FUTURE drags — they apply
             // bare, with no transaction. The one thing that may still move layout is a real
