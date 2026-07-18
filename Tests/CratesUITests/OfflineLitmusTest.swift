@@ -20,7 +20,7 @@ import XCTest
 /// run must never blast audio from the host Mac.
 ///
 /// For a clean Phase A, uninstall the app from the simulator first:
-///   xcrun simctl uninstall booted co.crates.ios.app
+///   xcrun simctl uninstall booted me.nieuwdorp.crates
 final class OfflineLitmusTest: XCTestCase {
 
     private func shot(_ name: String) {

@@ -12,7 +12,7 @@ import Security
 /// and the type is trivially Swift-6 concurrency-clean.
 enum KeychainStore {
     /// Shared service name; a new secret is just a new `account` under it.
-    static let service = "co.crates.ios"
+    static let service = "me.nieuwdorp.crates"
 
     /// The accounts (keys) this app stores.
     enum Account {

@@ -7,8 +7,6 @@ import Foundation
 /// AVPlayer plays directly (see docs/research/reports/online-source-preview-feasibility.md).
 ///
 /// Stream URLs are signed and time-limited — cached briefly, re-resolved on expiry/failure.
-/// Personal-build feature: this file must be excluded from any App Store target (guideline
-/// 5.2.3 names these services; see the feasibility report).
 actor BandcampResolver {
     static let shared = BandcampResolver()
 

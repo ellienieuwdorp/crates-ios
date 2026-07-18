@@ -1,6 +1,6 @@
 name: CratesIOS
 options:
-  bundleIdPrefix: co.crates.ios
+  bundleIdPrefix: me.nieuwdorp
   deploymentTarget:
     iOS: "26.0"
   developmentLanguage: en
@@ -63,7 +63,7 @@ targets:
       - package: ZIPFoundation
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: co.crates.ios.app
+        PRODUCT_BUNDLE_IDENTIFIER: me.nieuwdorp.crates
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
@@ -81,9 +81,10 @@ targets:
         # The Crates server is HTTP-only. NSAllowsLocalNetworking exempts cleartext to hosts iOS
         # treats as "local" (RFC1918 IPs, *.local). But the server is often reached over Tailscale:
         # a 100.64.0.0/10 CGNAT IP or a *.ts.net MagicDNS name — NEITHER counts as local, so ATS
-        # blocks it. Tailscale tunnels are WireGuard-encrypted end to end, so we allow cleartext to
-        # arbitrary hosts (personal, non-App-Store build against a user-supplied server). ts.net is
-        # also called out explicitly so MagicDNS keeps working even if arbitrary loads is tightened.
+        # blocks it. Tailscale tunnels are WireGuard-encrypted end to end, so the current compatibility
+        # configuration allows cleartext to arbitrary hosts. This is intentionally tracked for
+        # replacement with the narrowest verified ATS policy before distribution. ts.net is also
+        # called out explicitly so MagicDNS keeps working even if arbitrary loads is tightened.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
           NSAllowsArbitraryLoads: true
@@ -110,7 +111,7 @@ targets:
       - target: CratesIOS
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: co.crates.ios.tests
+        PRODUCT_BUNDLE_IDENTIFIER: me.nieuwdorp.crates.tests
         GENERATE_INFOPLIST_FILE: YES
         # xcodegen sets TEST_HOST but relies on Xcode defaulting BUNDLE_LOADER = $(TEST_HOST).
         # This toolchain doesn't apply that default, so the test link gets no `-bundle_loader`
@@ -126,7 +127,7 @@ targets:
       - target: CratesIOS
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: co.crates.ios.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: me.nieuwdorp.crates.uitests
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: CratesIOS
 
