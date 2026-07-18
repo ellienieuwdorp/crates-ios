@@ -14,6 +14,7 @@
 		193D3BA1739A96CDAF4CFCE2 /* DownloadTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C53A00C491E2EBE88B90FC /* DownloadTransport.swift */; };
 		19CBD03F043C9C3F27EE7127 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53831629D0B87970C9632ED0 /* KeychainStore.swift */; };
 		1E7CF31DBE2DA8D014BE99F2 /* BandcampPreviewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9DBD9B048F7CEE024356958 /* BandcampPreviewTests.swift */; };
+		207202708E124662DFD9B68B /* demo-cover-solar-wind.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 8CBE88B40F077FD90314EECC /* demo-cover-solar-wind.jpg */; };
 		248C47C3620CD02839641615 /* LiveDownloadTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDB0525955F8F477948F18C4 /* LiveDownloadTest.swift */; };
 		249E458654888EE2C8BAE646 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20312628F250ED01FCC6CE9 /* RootView.swift */; };
 		254B263F7452CC17BD027798 /* RecentSearches.swift in Sources */ = {isa = PBXBuildFile; fileRef = 040A9DAFF20006CF83CB22EE /* RecentSearches.swift */; };
@@ -26,6 +27,7 @@
 		39D392488E0705343E812D61 /* PlaySyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE79EF9035A28BDB36894AAB /* PlaySyncTests.swift */; };
 		3A233EE9BF91FB17D855A02F /* PairingAndConnectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 700EA676F979A703F57D16E1 /* PairingAndConnectionTests.swift */; };
 		3B3A79535A0CEF2F83BC800D /* QueuePersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29AA6EDB730DEFDA1F6196EB /* QueuePersistenceTests.swift */; };
+		3E30B3A5C3BE12CE65B1DF39 /* demo-cover-voltage.jpg in Resources */ = {isa = PBXBuildFile; fileRef = D6CDBAB45AE072FEF8B02808 /* demo-cover-voltage.jpg */; };
 		3F630BAE5489C3071CC41368 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AA50F05EEABD9FC9A000343 /* SettingsView.swift */; };
 		40AEC920447730E4ABE5BFAB /* ArtworkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A5DB3C19790895966764C4 /* ArtworkStore.swift */; };
 		43EE4E153D2EF465E3C157E9 /* QueueJoltTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E487EA0142C78B56B864469 /* QueueJoltTests.swift */; };
@@ -40,9 +42,11 @@
 		69B9F44E5EC77BDE65BBA88B /* TrackRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBF48485281E435434369C0 /* TrackRow.swift */; };
 		6A31E1A7D591475AB07D57A0 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DC00D64A8A0FD34A11896FF /* NowPlayingView.swift */; };
 		6ED5DEE6CB120330965E668D /* LiveFLACStreamTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60149A16503774A63D1B64C /* LiveFLACStreamTest.swift */; };
+		7081C8BFE7BA4197374174A8 /* demo-cover-pulsar.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 3BBEE37EA408546D3A26DF59 /* demo-cover-pulsar.jpg */; };
 		7352AB267719927155144FE9 /* CratesTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75CDC4BE75A96D0E25D292BB /* CratesTheme.swift */; };
 		7E64F5853557FEA64C7A9C36 /* SmartQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9509D1AC5DEA3B2F21D9D6B /* SmartQueryTests.swift */; };
 		7FD5D644AE52B066CB334045 /* QueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1347EC1CF272B96885E64A /* QueueView.swift */; };
+		8184AFBB30E04A4290EF6867 /* demo-cover-submerged.jpg in Resources */ = {isa = PBXBuildFile; fileRef = FCD23E73357D78C73F7FC35C /* demo-cover-submerged.jpg */; };
 		85429CC1FCC2A1EECF421377 /* LibraryAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27719C50510D1DACDCA93C88 /* LibraryAPI.swift */; };
 		855017B1ECF71EDEE6BCD137 /* RetentionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E34C7F1285927AD30655C234 /* RetentionPolicyTests.swift */; };
 		85F7DAD971FA4C61B56356ED /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E4FCCE7FC3E804EA3B1C16 /* SampleData.swift */; };
@@ -56,11 +60,13 @@
 		A15FFA323153EDF5BB12B357 /* MiniPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41EC865971FDF1359DFE4B7 /* MiniPlayerView.swift */; };
 		A52EC1976FEA6166A9CC5275 /* SmartQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE634843E978B85EEE0C7282 /* SmartQuery.swift */; };
 		AA1746B31B2E5C22497A447F /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9646B84DADDFB8E8C9953DCA /* KeychainStoreTests.swift */; };
+		ADA897733052D693888E4665 /* demo-cover-reflections.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 77D3935ED12456551F87B8E0 /* demo-cover-reflections.jpg */; };
 		AFE8057617531AB7E9AA2A4A /* Crate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9531702C1597A6D684CAB237 /* Crate.swift */; };
 		B33FA8B00E195C98DF10BC77 /* MiniPlayerGestureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 048D6C7E490589D33768F8B6 /* MiniPlayerGestureTests.swift */; };
 		B8B1C46428339E1A98852AC0 /* ScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2986BFF1004568DA5842224F /* ScreenshotTests.swift */; };
 		B903A9952F2E74222545585F /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2831DF324E73C40736A0907D /* SearchView.swift */; };
 		BC1E2EAB842406A00C453E21 /* QueueMorphTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0539968E9838BCD7658A41 /* QueueMorphTests.swift */; };
+		BE4554C21213777BD165B079 /* demo-cover-cascade.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 0DF59D8FAAB64735579FE69F /* demo-cover-cascade.jpg */; };
 		C4BB6F3E37A22A7CFB37978E /* BackupImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79138C52D1C29791E4570485 /* BackupImporterTests.swift */; };
 		C72CEF6618A14EC975BA6352 /* Tune.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E512AF12151A31692C31BA /* Tune.swift */; };
 		CB4BF013C238A193304C0CCD /* QueueEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9391777C2C6FFF902C1AC262 /* QueueEditTests.swift */; };
@@ -101,6 +107,7 @@
 		0AA50F05EEABD9FC9A000343 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0C35501313D55349EA5F4E16 /* RealLibraryShotTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealLibraryShotTest.swift; sourceTree = "<group>"; };
 		0DBF48485281E435434369C0 /* TrackRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackRow.swift; sourceTree = "<group>"; };
+		0DF59D8FAAB64735579FE69F /* demo-cover-cascade.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "demo-cover-cascade.jpg"; sourceTree = "<group>"; };
 		10EE6A4CBF5B548805D8898C /* CratesUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CratesUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		195A3F980802D97CF3E62D69 /* BackupImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupImporter.swift; sourceTree = "<group>"; };
 		1C04C2F4BAF6E99DB006C6D3 /* CratesConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CratesConnection.swift; sourceTree = "<group>"; };
@@ -116,6 +123,7 @@
 		33678381AFC3198BA4895FA7 /* HomePins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomePins.swift; sourceTree = "<group>"; };
 		3798CA86619F933E48240037 /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
 		39E4FCCE7FC3E804EA3B1C16 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
+		3BBEE37EA408546D3A26DF59 /* demo-cover-pulsar.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "demo-cover-pulsar.jpg"; sourceTree = "<group>"; };
 		3D19A7281B794E6698F584CD /* LiveScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveScreenshotTests.swift; sourceTree = "<group>"; };
 		3DF942A696A92EBB50FA46CE /* DiskCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskCache.swift; sourceTree = "<group>"; };
 		45684C62CA4C37C2E03DDBE7 /* DecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecodingTests.swift; sourceTree = "<group>"; };
@@ -134,12 +142,14 @@
 		700EA676F979A703F57D16E1 /* PairingAndConnectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingAndConnectionTests.swift; sourceTree = "<group>"; };
 		7391405C9A98B3B42875020A /* CratesClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CratesClient.swift; sourceTree = "<group>"; };
 		75CDC4BE75A96D0E25D292BB /* CratesTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CratesTheme.swift; sourceTree = "<group>"; };
+		77D3935ED12456551F87B8E0 /* demo-cover-reflections.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "demo-cover-reflections.jpg"; sourceTree = "<group>"; };
 		79138C52D1C29791E4570485 /* BackupImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupImporterTests.swift; sourceTree = "<group>"; };
 		79E64303002837CAA4E1D955 /* CratesIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CratesIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D0539968E9838BCD7658A41 /* QueueMorphTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueMorphTests.swift; sourceTree = "<group>"; };
 		82E512AF12151A31692C31BA /* Tune.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tune.swift; sourceTree = "<group>"; };
 		8409104653FAA137A98C1DE3 /* BandcampResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampResolver.swift; sourceTree = "<group>"; };
 		891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSearchTests.swift; sourceTree = "<group>"; };
+		8CBE88B40F077FD90314EECC /* demo-cover-solar-wind.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "demo-cover-solar-wind.jpg"; sourceTree = "<group>"; };
 		9391777C2C6FFF902C1AC262 /* QueueEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueEditTests.swift; sourceTree = "<group>"; };
 		9531702C1597A6D684CAB237 /* Crate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crate.swift; sourceTree = "<group>"; };
 		9646B84DADDFB8E8C9953DCA /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
@@ -157,12 +167,14 @@
 		D20312628F250ED01FCC6CE9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		D228099FC10A72EE275DE786 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D48276B96A37B5A810C48BC1 /* SyncClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncClient.swift; sourceTree = "<group>"; };
+		D6CDBAB45AE072FEF8B02808 /* demo-cover-voltage.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "demo-cover-voltage.jpg"; sourceTree = "<group>"; };
 		DA3007968BFC91BE832DC137 /* FlexibleDecoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlexibleDecoding.swift; sourceTree = "<group>"; };
 		DBF5F8C28005848314B631B3 /* BackupModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupModels.swift; sourceTree = "<group>"; };
 		DC33A75CD4CD95B8B448AAA5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E34C7F1285927AD30655C234 /* RetentionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetentionPolicyTests.swift; sourceTree = "<group>"; };
 		E41EC865971FDF1359DFE4B7 /* MiniPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerView.swift; sourceTree = "<group>"; };
 		E92634E2CAEE31F32B9CBF97 /* CratesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CratesApp.swift; sourceTree = "<group>"; };
+		FCD23E73357D78C73F7FC35C /* demo-cover-submerged.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "demo-cover-submerged.jpg"; sourceTree = "<group>"; };
 		FE634843E978B85EEE0C7282 /* SmartQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartQuery.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -194,6 +206,7 @@
 			children = (
 				DC33A75CD4CD95B8B448AAA5 /* Assets.xcassets */,
 				D228099FC10A72EE275DE786 /* Info.plist */,
+				7A8DBD4BBE5AFFC475DED0ED /* DemoArtwork */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -304,6 +317,19 @@
 				10EE6A4CBF5B548805D8898C /* CratesUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		7A8DBD4BBE5AFFC475DED0ED /* DemoArtwork */ = {
+			isa = PBXGroup;
+			children = (
+				0DF59D8FAAB64735579FE69F /* demo-cover-cascade.jpg */,
+				3BBEE37EA408546D3A26DF59 /* demo-cover-pulsar.jpg */,
+				77D3935ED12456551F87B8E0 /* demo-cover-reflections.jpg */,
+				8CBE88B40F077FD90314EECC /* demo-cover-solar-wind.jpg */,
+				FCD23E73357D78C73F7FC35C /* demo-cover-submerged.jpg */,
+				D6CDBAB45AE072FEF8B02808 /* demo-cover-voltage.jpg */,
+			);
+			path = DemoArtwork;
 			sourceTree = "<group>";
 		};
 		7AF8906DB06757EDD9A58C16 = {
@@ -512,6 +538,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				D69FBF1737A8B7A89748E64B /* Assets.xcassets in Resources */,
+				BE4554C21213777BD165B079 /* demo-cover-cascade.jpg in Resources */,
+				7081C8BFE7BA4197374174A8 /* demo-cover-pulsar.jpg in Resources */,
+				ADA897733052D693888E4665 /* demo-cover-reflections.jpg in Resources */,
+				207202708E124662DFD9B68B /* demo-cover-solar-wind.jpg in Resources */,
+				8184AFBB30E04A4290EF6867 /* demo-cover-submerged.jpg in Resources */,
+				3E30B3A5C3BE12CE65B1DF39 /* demo-cover-voltage.jpg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
