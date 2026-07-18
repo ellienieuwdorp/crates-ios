@@ -1,34 +1,38 @@
 # Crates iOS
 
-Native iOS proof-of-concept client for the [Crates](https://crates.co) music server. The phone
-connects to a Crates server running on a computer it can reach — same LAN or a Tailscale
-tailnet from anywhere — and becomes an instant, offline-capable, iOS-native listening
-companion. Your library in your pocket, not just in your house.
+An independent native iPhone proof of concept for [Crates](https://crates.co). It is not the official app: the goal here is narrower—make an existing Crates library comfortable to browse, search, and play from a phone while the desktop app remains the place to manage it.
 
-**Start here → [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md)** — the alignment doc for anyone
-(human or agent) working on this project.
+Early POC; expect rough edges and breaking changes.
 
-## Docs
+## Features
 
-| Doc | What it is |
-| --- | --- |
-| [`docs/PHILOSOPHY.md`](docs/PHILOSOPHY.md) | Core direction, time-agnostic. Read first. |
-| [`docs/ideas/feature-ideas.md`](docs/ideas/feature-ideas.md) | The founding feature ideas, in full. |
-| [`docs/api/capabilities-and-hurdles.md`](docs/api/capabilities-and-hurdles.md) | What the Crates API enables/blocks for this app. |
-| [`docs/research/stack-decision.md`](docs/research/stack-decision.md) | Stack decision + library research. |
-| [`docs/research/reports/`](docs/research/reports/) | Deep-dive research reports (Liquid Glass, audio, persistence, product context, online-source preview feasibility). |
-| [`docs/design/`](docs/design/) | Dogfood-round design records — complaint → research → fix → on-device verification (`now-playing-redesign.md`, `dogfood-round-3.md`, `dogfood-round-4.md`). |
-| [`docs/TODO.md`](docs/TODO.md) | Roadmap, categorized, with per-item status. |
+- Pair with a Crates server over a local network or Tailscale, including MagicDNS names.
+- Browse and search a cache-first library, including while offline.
+- Stream or download audio with background and system Now Playing support.
+- Build an on-device queue with Play Next and Add to Queue swipe actions.
 
-## Server context
+## Demo
 
-- Crates desktop app exposes a REST API at `http://<host>:54735/resources`
-  (OpenAPI spec: `../api-specs/latest/openapi.yaml`, 1.15.3-beta.1, 447 paths).
-  `<host>` is a LAN IP or a Tailscale address (CGNAT 100.x IP / `*.ts.net` MagicDNS
-  name) — the server is plain HTTP either way; ATS is relaxed accordingly (personal
-  build; revisit before any App Store target).
-- Auth: `Authorization: Bearer <token>`, obtained through a pairing flow approved on the
-  desktop. (The spec claims a `Client-ID` header — that's wrong; verified against the live
-  server. Details in the API doc.)
-- Audio: `GET /stream/{tuneID}` with HTTP Range support. Library change notifications flow
-  over an undocumented websocket (no SSE); POC polls, websocket is a later upgrade.
+[Watch the simulator walkthrough (MP4)](Media/crates-ios-demo.mp4)
+
+<table>
+  <tr>
+    <td><img src="Media/Screenshots/01-home.png" alt="Home" width="220"></td>
+    <td><img src="Media/Screenshots/02-crate-detail.png" alt="Crate detail" width="220"></td>
+    <td><img src="Media/Screenshots/06-now-playing.png" alt="Now Playing" width="220"></td>
+  </tr>
+  <tr>
+    <td><img src="Media/Screenshots/04-play-next-swipe.png" alt="Play Next swipe action" width="220"></td>
+    <td><img src="Media/Screenshots/05-add-to-queue-swipe.png" alt="Add to Queue swipe action" width="220"></td>
+    <td><img src="Media/Screenshots/07-queue.png" alt="Expanded play queue" width="220"></td>
+  </tr>
+</table>
+
+## Build
+
+Requires iOS 26+, Xcode, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+
+```sh
+xcodegen generate
+open CratesIOS.xcodeproj
+```
