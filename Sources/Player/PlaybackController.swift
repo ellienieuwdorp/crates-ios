@@ -128,6 +128,11 @@ final class PlaybackController {
     /// so live simulator runs can assert real playback without blasting audio from the host Mac.
     @ObservationIgnored private let forceSilent =
         ProcessInfo.processInfo.arguments.contains("-uitestSilent")
+    /// Screenshot automation can opt into a bundled silent track so the player stays in a
+    /// representative playing state without a server or network dependency. Ordinary demo mode
+    /// remains intentionally honest about unavailable audio.
+    @ObservationIgnored private let usePlayableDemoFixture =
+        ProcessInfo.processInfo.arguments.contains("-uitestPlayableDemo")
 
     init() {
         // Category only — activation waits for the first actual play, so launching the app never
@@ -572,6 +577,10 @@ final class PlaybackController {
     /// instead of burning a doomed request.
     private func resolvePlaybackURL(for tune: Tune) -> URL? {
         if let local = downloads?.localFileURL(for: tune.id) { return local }
+        if usePlayableDemoFixture,
+           let fixture = Bundle.main.url(forResource: "demo-preview", withExtension: "m4a") {
+            return fixture
+        }
         guard tune.hasServerAudio != false else { return nil }
         guard let conn = connection, conn.isConfigured else { return nil }
         return conn.streamURL(tuneID: tune.id)

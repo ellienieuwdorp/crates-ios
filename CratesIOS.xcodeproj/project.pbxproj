@@ -79,6 +79,7 @@
 		DCD61B6C8383EBDB37AC9F14 /* PlaySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4F7597E2D8C39DB4B1582D /* PlaySync.swift */; };
 		DE69C9B1BE580D57745B3545 /* DownloadPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FE5ACC091E29F4EC940BBFB /* DownloadPolicyView.swift */; };
 		E73E8EDDF4129602F3226569 /* Artwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF0C39026FFC092EAE7BF08 /* Artwork.swift */; };
+		E818A9B5E8B578B76E171E6C /* demo-preview.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 939B5A60C17409090935BBCB /* demo-preview.m4a */; };
 		F324136B0A2E8153BF641CDE /* BandcampResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8409104653FAA137A98C1DE3 /* BandcampResolver.swift */; };
 /* End PBXBuildFile section */
 
@@ -151,6 +152,7 @@
 		891AFA0559B3DBD62EC30EA4 /* LocalSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSearchTests.swift; sourceTree = "<group>"; };
 		8CBE88B40F077FD90314EECC /* demo-cover-solar-wind.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "demo-cover-solar-wind.jpg"; sourceTree = "<group>"; };
 		9391777C2C6FFF902C1AC262 /* QueueEditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueEditTests.swift; sourceTree = "<group>"; };
+		939B5A60C17409090935BBCB /* demo-preview.m4a */ = {isa = PBXFileReference; path = "demo-preview.m4a"; sourceTree = "<group>"; };
 		9531702C1597A6D684CAB237 /* Crate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Crate.swift; sourceTree = "<group>"; };
 		9646B84DADDFB8E8C9953DCA /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
 		9B4F7597E2D8C39DB4B1582D /* PlaySync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaySync.swift; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 				DC33A75CD4CD95B8B448AAA5 /* Assets.xcassets */,
 				D228099FC10A72EE275DE786 /* Info.plist */,
 				7A8DBD4BBE5AFFC475DED0ED /* DemoArtwork */,
+				F0C392862C2CC2CC2C48927C /* DemoAudio */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -424,6 +427,14 @@
 			path = Home;
 			sourceTree = "<group>";
 		};
+		F0C392862C2CC2CC2C48927C /* DemoAudio */ = {
+			isa = PBXGroup;
+			children = (
+				939B5A60C17409090935BBCB /* demo-preview.m4a */,
+			);
+			path = DemoAudio;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -544,6 +555,7 @@
 				207202708E124662DFD9B68B /* demo-cover-solar-wind.jpg in Resources */,
 				8184AFBB30E04A4290EF6867 /* demo-cover-submerged.jpg in Resources */,
 				3E30B3A5C3BE12CE65B1DF39 /* demo-cover-voltage.jpg in Resources */,
+				E818A9B5E8B578B76E171E6C /* demo-preview.m4a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
